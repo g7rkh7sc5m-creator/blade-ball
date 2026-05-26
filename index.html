@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blade Ball 3D — Fixed Full Game</title>
+    <title>Blade Ball 3D — Полная Рабочая Версия</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #111116; font-family: sans-serif; user-select: none; }
         #ui {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
             color: white; font-size: 24px; font-weight: bold; pointer-events: none;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8); text-align: center;
-            z-index: 10;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8); text-align: center; z-index: 10;
         }
         #instructions { font-size: 14px; color: #aaa; margin-top: 5px; }
         #alive-counter { font-size: 16px; color: #ff2e63; margin-top: 5px; }
     </style>
-    <!-- Подключаем библиотеку Three.js -->
+    <!-- Подключаем стабильную версию Three.js -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
@@ -27,7 +26,7 @@
     </div>
 
     <script>
-        // === ЧАСТЬ 1: НАСТРОЙКИ, СОЗДАНИЕ СЦЕНЫ И ОБЪЕКТОВ ===
+        // === ЧАСТЬ 1: НАСТРОЙКИ СЦЕНЫ И СОЗДАНИЕ МИРА ===
         let scene, camera, renderer, player, ball;
         let bots = [];
         let currentTarget = null;
@@ -43,7 +42,7 @@
         const BOT_COUNT = 3;
 
         function init() {
-            // Создаем сцену и рендер
+            // Создаем трехмерную сцену
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x111322);
             
@@ -54,7 +53,7 @@
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // Освещение
+            // Освещение (базовый свет + направленный)
             scene.add(new THREE.AmbientLight(0xffffff, 0.6));
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
             dirLight.position.set(10, 30, 10);
@@ -69,7 +68,8 @@
             floor.receiveShadow = true;
             scene.add(floor);
 
-            const grid = new THREE.GridHelper(ARENA_SIZE * 2, 20, 0xff2e63, 0x222);
+            // Сетка на полу (красные линии как в Blade Ball)
+            const grid = new THREE.GridHelper(ARENA_SIZE * 2, 20, 0xff2e63, 0x333344);
             grid.position.y = 0.01;
             scene.add(grid);
 
@@ -83,7 +83,7 @@
             player.isAlive = true;
             scene.add(player);
 
-            // Создаем мяч (Красный шар)
+            // Создаем летящий мяч (Красный светящийся шар)
             const ballGeo = new THREE.SphereGeometry(0.8, 32, 32);
             const ballMat = new THREE.MeshStandardMaterial({ color: 0xff2e63, emissive: 0xff2e63, emissiveIntensity: 0.6 });
             ball = new THREE.Mesh(ballGeo, ballMat);
@@ -91,15 +91,15 @@
             ball.castShadow = true;
             scene.add(ball);
 
-            // Теперь безопасно генерируем ботов
+            // Генерируем ботов
             createBots();
 
-            // Слушатели ввода (управление)
+            // Подключаем управление (WASD, Стрелки, Пробел)
             window.addEventListener('keydown', (e) => handleInput(e, true));
             window.addEventListener('keyup', (e) => handleInput(e, false));
             window.addEventListener('resize', onWindowResize);
 
-            // Запуск игры
+            // Выбираем первую цель для мяча и запускаем игровой цикл
             selectNewTarget();
             animate();
         }
@@ -122,7 +122,7 @@
                 bots.push(bot);
                 scene.add(bot);
             }
-        } // === ЧАСТЬ 2: УПРАВЛЕНИЕ, КОРРЕКТНЫЙ ИГРОВОЙ ЦИКЛ И ПЕРЕЗАПУСК ===
+        } // === ЧАСТЬ 2: УПРАВЛЕНИЕ, КОРРЕКТНЫЙ ИГРОВОЙ ЦИКЛ И ПРЯМОЙ ЗАПУСК ===
         function selectNewTarget(exception) {
             let pool = [];
             if (player && player.isAlive && player !== exception) pool.push(player);
@@ -206,7 +206,6 @@
         function animate() {
             requestAnimationFrame(animate);
 
-            // Безопасная проверка: рендерим только если сцена полностью готова
             if (!player || !ball) return;
 
             // 1. Движение игрока
@@ -301,8 +300,8 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Автоматический запуск после загрузки страницы
-        window.onload = init;
+        // ПРЯМОЙ ПРИНУДИТЕЛЬНЫЙ ЗАПУСК ДВИЖКА
+        init();
     </script>
 </body>
 </html>
