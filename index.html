@@ -3,17 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blade Ball 3D — Single File</title>
+    <title>Blade Ball 3D — Full Game</title>
     <style>
         body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; user-select: none; }
         #ui {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
             color: white; font-size: 24px; font-weight: bold; pointer-events: none;
             text-shadow: 2px 2px 4px rgba(0,0,0,0.8); text-align: center;
+            z-index: 10;
         }
         #instructions { font-size: 14px; color: #aaa; margin-top: 5px; }
         #alive-counter { font-size: 16px; color: #ff2e63; margin-top: 5px; }
     </style>
+    <!-- Подключаем библиотеку Three.js -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
@@ -21,11 +23,11 @@
     <div id="ui">
         Счёт отбиваний: <span id="score">0</span>
         <div id="alive-counter">Осталось бойцов: <span id="bots-count">4</span></div>
-        <div id="instructions">WASD — движение | ПРОБЕЛ — блок вовремя</div>
+        <div id="instructions">WASD или Стрелки — движение | ПРОБЕЛ — блок вовремя</div>
     </div>
 
     <script>
-        // === ЧАСТЬ 1: НАСТРОЙКИ И ИНИЦИАЛИЗАЦИЯ СЦЕНЫ ===
+        // === ЧАСТЬ 1: НАСТРОЙКИ И ИНИЦИАЛИЗАЦИЯ ===
         let scene, camera, renderer, player, ball;
         let bots = [];
         let currentTarget = null;
@@ -68,6 +70,7 @@
             grid.position.y = 0.01;
             scene.add(grid);
 
+            // Создаем игрока
             const playerGeo = new THREE.SphereGeometry(1, 32, 32);
             const playerMat = new THREE.MeshStandardMaterial({ color: 0x00adb5, metalness: 0.3 });
             player = new THREE.Mesh(playerGeo, playerMat);
@@ -79,12 +82,14 @@
 
             createBots();
 
+            // Создаем мяч
             const ballGeo = new THREE.SphereGeometry(0.8, 32, 32);
             const ballMat = new THREE.MeshStandardMaterial({ color: 0xff2e63, emissive: 0xff2e63, emissiveIntensity: 0.6 });
             ball = new THREE.Mesh(ballGeo, ballMat);
             ball.castShadow = true;
             scene.add(ball);
 
+            // Слушатели управления (WASD + Стрелки)
             window.addEventListener('keydown', (e) => handleInput(e, true));
             window.addEventListener('keyup', (e) => handleInput(e, false));
             window.addEventListener('resize', onWindowResize);
@@ -96,7 +101,7 @@
         function createBots() {
             bots.forEach(b => scene.remove(b));
             bots = [];
-          const botMat = new THREE.MeshStandardMaterial({ color: 0x9b5de5, metalness: 0.2 });
+            const botMat = new THREE.MeshStandardMaterial({ color: 0x9b5de5, metalness: 0.2 });
             const botGeo = new THREE.SphereGeometry(1, 32, 32);
 
             for (let i = 0; i < BOT_COUNT; i++) {
@@ -111,7 +116,7 @@
                 bots.push(bot);
                 scene.add(bot);
             }
-        }// === ЧАСТЬ 2: ЛОГИКА МЯЧА, БОТОВ, УПРАВЛЕНИЯ И АНИМАЦИИ ===
+        }// === ЧАСТЬ 2: ЛОГИКА ИГРЫ И ИСПРАВЛЕННЫЙ АНИМАЦИОННЫЙ ЦИКЛ ===
         function selectNewTarget(exception) {
             let pool = [];
             if (player.isAlive && player !== exception) pool.push(player);
@@ -194,6 +199,7 @@
         function animate() {
             requestAnimationFrame(animate);
 
+            // 1. Движение игрока
             if (player.isAlive) {
                 const moveSpeed = 0.22;
                 if (keys.w && player.position.z > -ARENA_SIZE) player.position.z -= moveSpeed;
@@ -202,6 +208,7 @@
                 if (keys.d && player.position.x < ARENA_SIZE) player.position.x += moveSpeed;
             }
 
+            // 2. Движение ботов
             bots.forEach(bot => {
                 if (!bot.isAlive) return;
 
@@ -212,11 +219,12 @@
                 }
 
                 bot.position.addScaledVector(bot.moveDir, 0.12);
-                bot.position.clamp(
-                    new THREE.Vector3(-ARENA_SIZE + 1, 1, -ARENA_SIZE + 1),
-                    new THREE.Vector3(ARENA_SIZE - 1, 1, ARENA_SIZE - 1)
-                );
-              let distToBall = bot.position.distanceTo(ball.position);
+                
+                // Ограничение ботов в рамках арены (исправлено)
+bot.position.x = THREE.MathUtils.clamp(bot.position.x, -ARENA_SIZE + 1, ARENA_SIZE - 1);
+                bot.position.z = THREE.MathUtils.clamp(bot.position.z, -ARENA_SIZE + 1, ARENA_SIZE - 1);
+
+                let distToBall = bot.position.distanceTo(ball.position);
                 if (currentTarget === bot && distToBall < (3.0 + ballSpeed * 5) && !bot.isBlocking) {
                     let reactionChance = Math.random();
                     if (reactionChance > (ballSpeed * 0.5 - 0.05)) { 
@@ -231,6 +239,7 @@
                 }
             });
 
+            // 3. Логика мяча (самонаведение)
             if (currentTarget && currentTarget.isAlive) {
                 let targetDir = new THREE.Vector3().subVectors(currentTarget.position, ball.position).normalize();
                 ballDirection.lerp(targetDir, 0.08); 
@@ -266,6 +275,7 @@
                 selectNewTarget();
             }
 
+            // 4. Следование камеры
             if (player.isAlive) {
                 camera.position.x = THREE.MathUtils.lerp(camera.position.x, player.position.x, 0.08);
                 camera.position.y = THREE.MathUtils.lerp(camera.position.y, player.position.y + 7, 0.08);
