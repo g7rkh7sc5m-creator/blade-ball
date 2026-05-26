@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blade Ball 3D — Full Game</title>
+    <title>Blade Ball 3D — Fixed Full Game</title>
     <style>
         body { margin: 0; overflow: hidden; background: #111; font-family: sans-serif; user-select: none; }
         #ui {
@@ -23,11 +23,11 @@
     <div id="ui">
         Счёт отбиваний: <span id="score">0</span>
         <div id="alive-counter">Осталось бойцов: <span id="bots-count">4</span></div>
-        <div id="instructions">WASD или Стрелки — движение | ПРОБЕЛ — блок вовремя</div>
+        <div id="instructions">WASD / Стрелки — движение | ПРОБЕЛ — блок вовремя</div>
     </div>
 
     <script>
-        // === ЧАСТЬ 1: НАСТРОЙКИ И ИНИЦИАЛИЗАЦИЯ ===
+        // === ЧАСТЬ 1: НАСТРОЙКИ, СОЗДАНИЕ СЦЕНЫ И ОБЪЕКТОВ ===
         let scene, camera, renderer, player, ball;
         let bots = [];
         let currentTarget = null;
@@ -43,6 +43,7 @@
         const BOT_COUNT = 3;
 
         function init() {
+            // Создаем сцену и рендер
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x111322);
             
@@ -53,12 +54,14 @@
             renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            // Освещение
+            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
             const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
             dirLight.position.set(10, 30, 10);
             dirLight.castShadow = true;
             scene.add(dirLight);
 
+            // Создаем пол (Арена)
             const floorGeo = new THREE.BoxGeometry(ARENA_SIZE * 2, 1, ARENA_SIZE * 2);
             const floorMat = new THREE.MeshStandardMaterial({ color: 0x1f1f2e, roughness: 0.7 });
             const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -70,7 +73,7 @@
             grid.position.y = 0.01;
             scene.add(grid);
 
-            // Создаем игрока
+            // Создаем игрока (Синий шар)
             const playerGeo = new THREE.SphereGeometry(1, 32, 32);
             const playerMat = new THREE.MeshStandardMaterial({ color: 0x00adb5, metalness: 0.3 });
             player = new THREE.Mesh(playerGeo, playerMat);
@@ -80,21 +83,24 @@
             player.isAlive = true;
             scene.add(player);
 
-            createBots();
-
-            // Создаем мяч
+            // Создаем мяч (Красный шар)
             const ballGeo = new THREE.SphereGeometry(0.8, 32, 32);
             const ballMat = new THREE.MeshStandardMaterial({ color: 0xff2e63, emissive: 0xff2e63, emissiveIntensity: 0.6 });
             ball = new THREE.Mesh(ballGeo, ballMat);
+            ball.position.set(0, 1, -10);
             ball.castShadow = true;
             scene.add(ball);
 
-            // Слушатели управления (WASD + Стрелки)
+            // Теперь безопасно генерируем ботов
+            createBots();
+
+            // Слушатели ввода (управление)
             window.addEventListener('keydown', (e) => handleInput(e, true));
             window.addEventListener('keyup', (e) => handleInput(e, false));
             window.addEventListener('resize', onWindowResize);
 
-            restartGame();
+            // Запуск игры
+            selectNewTarget();
             animate();
         }
 
@@ -116,10 +122,10 @@
                 bots.push(bot);
                 scene.add(bot);
             }
-        }// === ЧАСТЬ 2: ЛОГИКА ИГРЫ И ИСПРАВЛЕННЫЙ АНИМАЦИОННЫЙ ЦИКЛ ===
+        } // === ЧАСТЬ 2: УПРАВЛЕНИЕ, КОРРЕКТНЫЙ ИГРОВОЙ ЦИКЛ И ПЕРЕЗАПУСК ===
         function selectNewTarget(exception) {
             let pool = [];
-            if (player.isAlive && player !== exception) pool.push(player);
+            if (player && player.isAlive && player !== exception) pool.push(player);
             bots.forEach(b => {
                 if (b.isAlive && b !== exception) pool.push(b);
             });
@@ -131,7 +137,7 @@
             if (pool.length > 0) {
                 currentTarget = pool[Math.floor(Math.random() * pool.length)];
                 bots.forEach(b => { if(b.isAlive) b.material.color.setHex(0x9b5de5); });
-                if (player.isAlive && !isBlocking) player.material.color.setHex(0x00adb5);
+                if (player && player.isAlive && !isBlocking) player.material.color.setHex(0x00adb5);
                 
                 if (currentTarget !== player) {
                     currentTarget.material.color.setHex(0xff9f1c);
@@ -143,16 +149,17 @@
         }
 
         function updateAliveCounter() {
-            let count = (player.isAlive ? 1 : 0) + bots.filter(b => b.isAlive).length;
+            let count = ((player && player.isAlive) ? 1 : 0) + bots.filter(b => b.isAlive).length;
             document.getElementById('bots-count').innerText = count;
             
-            if (count === 1 && player.isAlive) {
+            if (count === 1 && player && player.isAlive) {
                 alert("ПОБЕДА! Вы уничтожили всех ботов!");
                 restartGame();
             }
         }
 
         function restartGame() {
+            if (!player || !ball) return;
             player.isAlive = true;
             player.position.set(0, 1, 15);
             player.material.color.setHex(0x00adb5);
@@ -177,7 +184,7 @@
 
             if (keys.hasOwnProperty(key)) keys[key] = isDown;
 
-            if (key === 'Space' && isDown && !blockCooldown && !isBlocking && player.isAlive) {
+            if (key === 'Space' && isDown && !blockCooldown && !isBlocking && player && player.isAlive) {
                 triggerPlayerBlock();
             }
         }
@@ -198,6 +205,9 @@
 
         function animate() {
             requestAnimationFrame(animate);
+
+            // Безопасная проверка: рендерим только если сцена полностью готова
+            if (!player || !ball) return;
 
             // 1. Движение игрока
             if (player.isAlive) {
@@ -220,8 +230,7 @@
 
                 bot.position.addScaledVector(bot.moveDir, 0.12);
                 
-                // Ограничение ботов в рамках арены (исправлено)
-bot.position.x = THREE.MathUtils.clamp(bot.position.x, -ARENA_SIZE + 1, ARENA_SIZE - 1);
+                bot.position.x = THREE.MathUtils.clamp(bot.position.x, -ARENA_SIZE + 1, ARENA_SIZE - 1);
                 bot.position.z = THREE.MathUtils.clamp(bot.position.z, -ARENA_SIZE + 1, ARENA_SIZE - 1);
 
                 let distToBall = bot.position.distanceTo(ball.position);
@@ -292,7 +301,8 @@ bot.position.x = THREE.MathUtils.clamp(bot.position.x, -ARENA_SIZE + 1, ARENA_SI
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        init();
+        // Автоматический запуск после загрузки страницы
+        window.onload = init;
     </script>
 </body>
 </html>
