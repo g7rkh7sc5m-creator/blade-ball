@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blade Ball 3D — Полная Рабочая Версия</title>
+    <title>Blade Ball 3D — 100% Working</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #111116; font-family: sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; user-select: none; }
         #ui {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
             color: white; font-size: 24px; font-weight: bold; pointer-events: none;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.8); text-align: center; z-index: 10;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9); text-align: center; z-index: 10;
         }
         #instructions { font-size: 14px; color: #aaa; margin-top: 5px; }
         #alive-counter { font-size: 16px; color: #ff2e63; margin-top: 5px; }
@@ -26,7 +26,7 @@
     </div>
 
     <script>
-        // === ЧАСТЬ 1: НАСТРОЙКИ СЦЕНЫ И СОЗДАНИЕ МИРА ===
+        // === ЧАСТЬ 1: ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И СОЗДАНИЕ ОБЪЕКТОВ ===
         let scene, camera, renderer, player, ball;
         let bots = [];
         let currentTarget = null;
@@ -42,64 +42,53 @@
         const BOT_COUNT = 3;
 
         function init() {
-            // Создаем трехмерную сцену
+            // Инициализация сцены и рендера
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x111322);
+            scene.background = new THREE.Color(0x050510);
             
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.shadowMap.enabled = true;
             document.body.appendChild(renderer.domElement);
 
-            // Освещение (базовый свет + направленный)
-            scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(10, 30, 10);
-            dirLight.castShadow = true;
-            scene.add(dirLight);
-
-            // Создаем пол (Арена)
-            const floorGeo = new THREE.BoxGeometry(ARENA_SIZE * 2, 1, ARENA_SIZE * 2);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x1f1f2e, roughness: 0.7 });
+            // Пол арены (используем базовый материал без теней — запустится везде!)
+            const floorGeo = new THREE.BoxGeometry(ARENA_SIZE * 2, 0.2, ARENA_SIZE * 2);
+            const floorMat = new THREE.MeshBasicMaterial({ color: 0x111122 });
             const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.position.y = -0.5;
-            floor.receiveShadow = true;
+            floor.position.y = -0.1;
             scene.add(floor);
 
-            // Сетка на полу (красные линии как в Blade Ball)
-            const grid = new THREE.GridHelper(ARENA_SIZE * 2, 20, 0xff2e63, 0x333344);
+            // Красная сетка поверх пола для ориентира
+            const grid = new THREE.GridHelper(ARENA_SIZE * 2, 20, 0xff2e63, 0x222233);
             grid.position.y = 0.01;
             scene.add(grid);
 
-            // Создаем игрока (Синий шар)
-            const playerGeo = new THREE.SphereGeometry(1, 32, 32);
-            const playerMat = new THREE.MeshStandardMaterial({ color: 0x00adb5, metalness: 0.3 });
+            // Игрок (Синий шар)
+            const playerGeo = new THREE.SphereGeometry(1, 16, 16);
+            const playerMat = new THREE.MeshBasicMaterial({ color: 0x00adb5 });
             player = new THREE.Mesh(playerGeo, playerMat);
             player.position.set(0, 1, 15);
-            player.castShadow = true;
             player.isPlayer = true;
             player.isAlive = true;
             scene.add(player);
 
-            // Создаем летящий мяч (Красный светящийся шар)
-            const ballGeo = new THREE.SphereGeometry(0.8, 32, 32);
-            const ballMat = new THREE.MeshStandardMaterial({ color: 0xff2e63, emissive: 0xff2e63, emissiveIntensity: 0.6 });
+            // Мяч-убийца (Красный шар)
+            const ballGeo = new THREE.SphereGeometry(0.8, 16, 16);
+            const ballMat = new THREE.MeshBasicMaterial({ color: 0xff2e63 });
             ball = new THREE.Mesh(ballGeo, ballMat);
             ball.position.set(0, 1, -10);
-            ball.castShadow = true;
             scene.add(ball);
 
-            // Генерируем ботов
+            // Создание ботов
             createBots();
 
-            // Подключаем управление (WASD, Стрелки, Пробел)
+            // Обработка клавиш и ресайза окна
             window.addEventListener('keydown', (e) => handleInput(e, true));
             window.addEventListener('keyup', (e) => handleInput(e, false));
             window.addEventListener('resize', onWindowResize);
 
-            // Выбираем первую цель для мяча и запускаем игровой цикл
+            // Старт игры
             selectNewTarget();
             animate();
         }
@@ -107,13 +96,12 @@
         function createBots() {
             bots.forEach(b => scene.remove(b));
             bots = [];
-            const botMat = new THREE.MeshStandardMaterial({ color: 0x9b5de5, metalness: 0.2 });
-            const botGeo = new THREE.SphereGeometry(1, 32, 32);
+            const botMat = new THREE.MeshBasicMaterial({ color: 0x9b5de5 });
+            const botGeo = new THREE.SphereGeometry(1, 16, 16);
 
             for (let i = 0; i < BOT_COUNT; i++) {
                 const bot = new THREE.Mesh(botGeo, botMat.clone());
                 bot.position.set((Math.random() - 0.5) * (ARENA_SIZE * 1.5), 1, (Math.random() - 0.5) * (ARENA_SIZE * 1.5));
-                bot.castShadow = true;
                 bot.isPlayer = false;
                 bot.isAlive = true;
                 bot.aiTimer = 0;
@@ -122,7 +110,7 @@
                 bots.push(bot);
                 scene.add(bot);
             }
-        } // === ЧАСТЬ 2: УПРАВЛЕНИЕ, КОРРЕКТНЫЙ ИГРОВОЙ ЦИКЛ И ПРЯМОЙ ЗАПУСК ===
+        } // === ЧАСТЬ 2: УПРАВЛЕНИЕ, КОРРЕКТНЫЙ ИГРОВОЙ ЦИКЛ И ОПТИМИЗИРОВАННЫЙ ЗАПУСК ===
         function selectNewTarget(exception) {
             let pool = [];
             if (player && player.isAlive && player !== exception) pool.push(player);
@@ -300,7 +288,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // ПРЯМОЙ ПРИНУДИТЕЛЬНЫЙ ЗАПУСК ДВИЖКА
+        // Принудительный запуск
         init();
     </script>
 </body>
