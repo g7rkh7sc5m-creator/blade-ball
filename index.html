@@ -114,7 +114,8 @@
                 bots.push(bot);
                 scene.add(bot);
             }
-        }        // === ЧАСТЬ 2: ЛОГИКА ИГРЫ И ГАРАНТИРОВАННЫЙ ЗАПУСК ===
+        }
+                // === ЧАСТЬ 2: ЛОГИКА ИГРЫ И ГАРАНТИРОВАННЫЙ ЗАПУСК ===
         function selectNewTarget(exception) {
             let pool = [];
             if (player && player.isAlive && player !== exception) pool.push(player);
