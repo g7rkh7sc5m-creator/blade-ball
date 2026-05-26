@@ -3,19 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blade Ball 3D — 100% Working</title>
+    <title>Blade Ball 3D — No Libraries Edition</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #0b0b16; font-family: sans-serif; user-select: none; }
         #ui {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
             color: white; font-size: 24px; font-weight: bold; pointer-events: none;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.9); text-align: center; z-index: 10;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.9); text-align: center; z-index: 10;
         }
-        #instructions { font-size: 14px; color: #aaa; margin-top: 5px; }
+        #instructions { font-size: 14px; color: #bbb; margin-top: 5px; }
         #alive-counter { font-size: 16px; color: #ff2e63; margin-top: 5px; }
+        canvas { display: block; width: 100vw; height: 100vh; }
     </style>
-    <!-- Подключаем стабильную версию Three.js -->
-    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
@@ -25,271 +24,303 @@
         <div id="instructions">WASD / Стрелки — движение | ПРОБЕЛ — блок вовремя</div>
     </div>
 
+    <!-- Наш собственный 3D Холст -->
+    <canvas id="glCanvas"></canvas>
+
     <script>
-        // === ЧАСТЬ 1: ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ И СОЗДАНИЕ ОБЪЕКТОВ ===
-        let scene, camera, renderer, player, ball;
-        let bots = [];
-        let currentTarget = null;
-        
-        let keys = { w: false, a: false, s: false, d: false, Space: false };
-        let ballSpeed = 0.18;
-        let ballDirection = new THREE.Vector3();
-        let score = 0;
-        let isBlocking = false;
-        let blockCooldown = false;
+        // === ЧАСТЬ 1: МАТЕМАТИЧЕСКИЙ 3D-ДВИЖОК И НАСТРОЙКИ ===
+        const canvas = document.getElementById('glCanvas');
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
 
-        const ARENA_SIZE = 25;
-        const BOT_COUNT = 3;
-
-        function init() {
-            // Инициализация сцены и рендера
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x050510);
-            
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-            
-            renderer = new THREE.WebGLRenderer({ antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
-            // Пол арены (используем базовый материал без теней — запустится везде!)
-            const floorGeo = new THREE.BoxGeometry(ARENA_SIZE * 2, 0.2, ARENA_SIZE * 2);
-            const floorMat = new THREE.MeshBasicMaterial({ color: 0x111122 });
-            const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.position.y = -0.1;
-            scene.add(floor);
-
-            // Красная сетка поверх пола для ориентира
-            const grid = new THREE.GridHelper(ARENA_SIZE * 2, 20, 0xff2e63, 0x222233);
-            grid.position.y = 0.01;
-            scene.add(grid);
-
-            // Игрок (Синий шар)
-            const playerGeo = new THREE.SphereGeometry(1, 16, 16);
-            const playerMat = new THREE.MeshBasicMaterial({ color: 0x00adb5 });
-            player = new THREE.Mesh(playerGeo, playerMat);
-            player.position.set(0, 1, 15);
-            player.isPlayer = true;
-            player.isAlive = true;
-            scene.add(player);
-
-            // Мяч-убийца (Красный шар)
-            const ballGeo = new THREE.SphereGeometry(0.8, 16, 16);
-            const ballMat = new THREE.MeshBasicMaterial({ color: 0xff2e63 });
-            ball = new THREE.Mesh(ballGeo, ballMat);
-            ball.position.set(0, 1, -10);
-            scene.add(ball);
-
-            // Создание ботов
-            createBots();
-
-            // Обработка клавиш и ресайза окна
-            window.addEventListener('keydown', (e) => handleInput(e, true));
-            window.addEventListener('keyup', (e) => handleInput(e, false));
-            window.addEventListener('resize', onWindowResize);
-
-            // Старт игры
-            selectNewTarget();
-            animate();
+        if (!gl) {
+            alert('Извините, ваш браузер или устройство не поддерживают WebGL 3D.');
         }
 
-        function createBots() {
-            bots.forEach(b => scene.remove(b));
-            bots = [];
-            const botMat = new THREE.MeshBasicMaterial({ color: 0x9b5de5 });
-            const botGeo = new THREE.SphereGeometry(1, 16, 16);
+        // Встроенные 3D Шейдеры (пишем графику напрямую в видеокарту)
+        const vsSource = `
+            attribute vec4 aPosition; attribute vec4 aColor;
+            uniform mat4 uMvpMatrix; painting uniform vec4 uCustomColor;
+            varying lowp vec4 vColor;
+            void main() { gl_Position = uMvpMatrix * aPosition; vColor = (uCustomColor.a > 0.0) ? uCustomColor : aColor; }
+        `;
+        const fsSource = `varying lowp vec4 vColor; void main() { gl_FragColor = vColor; }`;
 
-            for (let i = 0; i < BOT_COUNT; i++) {
-                const bot = new THREE.Mesh(botGeo, botMat.clone());
-                bot.position.set((Math.random() - 0.5) * (ARENA_SIZE * 1.5), 1, (Math.random() - 0.5) * (ARENA_SIZE * 1.5));
-                bot.isPlayer = false;
-                bot.isAlive = true;
-                bot.aiTimer = 0;
-                bot.moveDir = new THREE.Vector3();
-                bot.isBlocking = false;
-                bots.push(bot);
-                scene.add(bot);
+        function initShader(gl, vsSource, fsSource) {
+            const vs = gl.createShader(gl.VERTEX_SHADER); gl.shaderSource(vs, vsSource); gl.compileShader(vs);
+            const fs = gl.createShader(gl.FRAGMENT_SHADER); gl.shaderSource(fs, fsSource); gl.compileShader(fs);
+            const prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
+            return prog;
+        }
+
+        const program = initShader(gl, vsSource, fsSource);
+        gl.useProgram(program);
+
+        const aPosition = gl.getAttribLocation(program, 'aPosition');
+        const aColor = gl.getAttribLocation(program, 'aColor');
+        const uMvpMatrix = gl.getUniformLocation(program, 'uMvpMatrix');
+        const uCustomColor = gl.getUniformLocation(program, 'uCustomColor');
+
+        // Создаем форму 3D Куба для персонажей и мяча
+        const vertices = new Float32Array([
+            -1,-1,-1,  1,-1,-1,  1, 1,-1, -1, 1,-1, -1,-1, 1,  1,-1, 1,  1, 1, 1, -1, 1, 1,
+            -1,-1,-1, -1, 1,-1, -1, 1, 1, -1,-1, 1,  1,-1,-1,  1, 1,-1,  1, 1, 1,  1,-1, 1,
+            -1,-1,-1, -1,-1, 1,  1,-1, 1,  1,-1,-1, -1, 1,-1, -1, 1, 1,  1, 1, 1,  1, 1,-1
+        ]);
+        const colors = new Float32Array(vertices.length).fill(0.6); // Базовый цвет
+
+        const indices = new Uint16Array([
+            0,1,2, 0,2,3, 4,5,6, 4,6,7, 8,9,10, 8,10,11, 12,13,14, 12,14,15, 16,17,18, 16,18,19, 20,21,22, 20,22,23
+        ]);
+
+        const vertexBuffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer); gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+        const indexBuffer = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer); gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indices, gl.STATIC_DRAW);
+
+        // Игровые параметры
+        let playerX = 0, playerZ = 12, playerAlive = true, isBlocking = false, blockCooldown = false;
+        let ballX = 0, ballY = 1, ballZ = -10, ballVelX = 0, ballVelZ = 0, ballSpeed = 0.18;
+        let bots = [
+            {x: -10, z: -5, alive: true, timer: 0, dx: 0, dz: 0, blocking: false, color: [0.6, 0.2, 0.9, 1.0]},
+            {x: 10, z: -5, alive: true, timer: 0, dx: 0, dz: 0, blocking: false, color: [0.6, 0.2, 0.9, 1.0]},
+            {x: 0, z: -2, alive: true, timer: 0, dx: 0, dz: 0, blocking: false, color: [0.6, 0.2, 0.9, 1.0]}
+        ];
+        let currentTarget = null;
+        let score = 0;
+        let keys = {w:false, a:false, s:false, d:false};
+
+        const ARENA_SIZE = 22;
+
+        // Векторные 3D матрицы (замена библиотек на чистую математику)
+        function getMvpMatrix(posX, posY, posZ, scaleX, scaleY, scaleZ, camX, camY, camZ, tarX, tarY, tarZ) {
+            let m = new Float32Array(16);
+            // Базовое проецирование перспективы и камеры от третьего лица
+            let aspect = window.innerWidth / window.innerHeight;
+            let f = 1.0 / Math.tan(45 * Math.PI / 360);
+            let nf = 1.0 / (0.1 - 1000);
+            
+            // Матрица вида камеры
+            let zx = camX - tarX, zy = camY - tarY, zz = camZ - tarZ;
+            let r = 1.0 / Math.sqrt(zx*zx + zy*zy + zz*zz); zx*=r; zy*=r; zz*=r;
+            let xx = -zz, xz = zx; r = 1.0 / Math.sqrt(xx*xx + xz*xz); xx*=r; xz*=r;
+            let yx = zy*xz, yy = zx*xz - zz*xx, yz = -zy*xx;
+
+            // Перемножение матриц для рендера объекта в 3D пространстве
+            m[0] = (f/aspect) * (xx * scaleX); m[4] = (f/aspect) * yx; m[8] = (f/aspect) * zx;
+            m[1] = f * 0; m[5] = f * (yy * scaleY); m[9] = f * zy;
+            m[2] = xx * 0; m[6] = yx * 0; m[10] = nf * (0.1 + 1000) + nf * 2 * 0.1 * 1000;
+            m[3] = 0; m[7] = 0; m[11] = -1;
+            
+            // Смещение позиции
+            m[12] = posX - camX; m[13] = posY - camY; m[14] = posZ - camZ; m[15] = 1;
+            return m;
+        } // === ЧАСТЬ 2: УПРАВЛЕНИЕ, ЛОГИКА МЯЧА, БОТОВ И ЦИКЛ ОТРИСОВКИ ===
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            gl.viewport(0, 0, canvas.width, canvas.height);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        window.addEventListener('keydown', (e) => {
+            let k = e.key.toLowerCase();
+            if (keys.hasOwnProperty(k)) keys[k] = true;
+            if (e.code === 'Space' && !blockCooldown && !isBlocking && playerAlive) {
+                isBlocking = true;
+                blockCooldown = true;
+                setTimeout(() => {
+                    isBlocking = false;
+                    setTimeout(() => { blockCooldown = false; }, 400);
+                }, 300);
             }
-        } // === ЧАСТЬ 2: УПРАВЛЕНИЕ, КОРРЕКТНЫЙ ИГРОВОЙ ЦИКЛ И ОПТИМИЗИРОВАННЫЙ ЗАПУСК ===
+        });
+        window.addEventListener('keyup', (e) => {
+            let k = e.key.toLowerCase();
+            if (keys.hasOwnProperty(k)) keys[k] = false;
+        });
+
         function selectNewTarget(exception) {
             let pool = [];
-            if (player && player.isAlive && player !== exception) pool.push(player);
-            bots.forEach(b => {
-                if (b.isAlive && b !== exception) pool.push(b);
+            if (playerAlive && exception !== 'player') pool.push('player');
+            bots.forEach((b, idx) => {
+                if (b.alive && exception !== idx) pool.push(idx);
             });
-
-            if (pool.length === 0 && exception && exception.isAlive) {
+            if (pool.length === 0 && exception !== null) {
                 pool.push(exception);
             }
-
             if (pool.length > 0) {
                 currentTarget = pool[Math.floor(Math.random() * pool.length)];
-                bots.forEach(b => { if(b.isAlive) b.material.color.setHex(0x9b5de5); });
-                if (player && player.isAlive && !isBlocking) player.material.color.setHex(0x00adb5);
-                
-                if (currentTarget !== player) {
-                    currentTarget.material.color.setHex(0xff9f1c);
+                bots.forEach(b => { if(b.alive) { b.color[0] = 0.6; b.color[1] = 0.2; b.color[2] = 0.9; } });
+                if (currentTarget !== 'player' && typeof currentTarget === 'number') {
+                    bots[currentTarget].color = [1.0, 0.6, 0.1, 1.0]; // Оранжевая цель
                 }
             } else {
                 currentTarget = null;
             }
-            updateAliveCounter();
-        }
-
-        function updateAliveCounter() {
-            let count = ((player && player.isAlive) ? 1 : 0) + bots.filter(b => b.isAlive).length;
+            let count = (playerAlive ? 1 : 0) + bots.filter(b => b.alive).length;
             document.getElementById('bots-count').innerText = count;
-            
-            if (count === 1 && player && player.isAlive) {
+            if (count === 1 && playerAlive) {
                 alert("ПОБЕДА! Вы уничтожили всех ботов!");
-                restartGame();
+                resetGame();
             }
         }
 
-        function restartGame() {
-            if (!player || !ball) return;
-            player.isAlive = true;
-            player.position.set(0, 1, 15);
-            player.material.color.setHex(0x00adb5);
-            
-            createBots();
-            
-            ball.position.set(0, 1, -10);
-            ballSpeed = 0.18;
-            score = 0;
+        function resetGame() {
+            playerX = 0; playerZ = 12; playerAlive = true; isBlocking = false; blockCooldown = false;
+            ballX = 0; ballY = 1; ballZ = -10; ballSpeed = 0.18; score = 0;
             document.getElementById('score').innerText = score;
-            
+            bots.forEach(b => {
+                b.alive = true;
+                b.x = (Math.random() - 0.5) * 20;
+                b.z = (Math.random() - 0.5) * 15 - 2;
+                b.blocking = false;
+            });
             selectNewTarget();
         }
 
-        function handleInput(e, isDown) {
-            let key = e.key.toLowerCase();
-            if (e.code === 'Space') key = 'Space';
-            if (e.key === 'ArrowUp') key = 'w';
-            if (e.key === 'ArrowDown') key = 's';
-            if (e.key === 'ArrowLeft') key = 'a';
-            if (e.key === 'ArrowRight') key = 'd';
-
-            if (keys.hasOwnProperty(key)) keys[key] = isDown;
-
-            if (key === 'Space' && isDown && !blockCooldown && !isBlocking && player && player.isAlive) {
-                triggerPlayerBlock();
-            }
+        function drawObject(posX, posY, posZ, scaleX, scaleY, scaleZ, colorArr, camX, camY, camZ, tarX, tarY, tarZ) {
+            let mvp = getMvpMatrix(posX, posY, posZ, scaleX, scaleY, scaleZ, camX, camY, camZ, tarX, tarY, tarZ);
+            gl.uniformMatrix4fv(uMvpMatrix, false, mvp);
+            gl.uniform4fv(uCustomColor, new Float32Array(colorArr));
+            gl.drawElements(gl.TRIANGLES, indices.length, gl.UNSIGNED_SHORT, 0);
         }
 
-        function triggerPlayerBlock() {
-            isBlocking = true;
-            blockCooldown = true;
-            player.material.color.setHex(0x00ff00);
+        // Векторная 3D Матрица (чистая тригонометрия без внешних JS библиотек)
+        function getMvpMatrix(px, py, pz, sx, sy, sz, cx, cy, cz, tx, ty, tz) {
+            let m = new Float32Array(16);
+            let aspect = canvas.width / canvas.height;
+            let fov = 1.0 / Math.tan(30 * Math.PI / 180);
+            let near = 0.1, far = 100.0;
+            let nf = 1.0 / (near - far);
 
-            setTimeout(() => {
-                isBlocking = false;
-                if (currentTarget === player) player.material.color.setHex(0xff9f1c);
-                else player.material.color.setHex(0x00adb5);
-                
-                setTimeout(() => { blockCooldown = false; }, 400);
-            }, 300);
+            let zx = cx - tx, zy = cy - ty, zz = cz - tz;
+            let len = 1.0 / Math.sqrt(zx*zx + zy*zy + zz*zz); zx *= len; zy *= len; zz *= len;
+            let xx = -zz, xz = zx; len = 1.0 / Math.sqrt(xx*xx + xz*xz); xx *= len; xz *= len;
+            let yx = zy*xz, yy = zx*xz - zz*xx, yz = -zy*xx;
+
+            m[0] = (fov/aspect) * xx * sx; m[1] = fov * yx * sx; m[2] = zx * sx; m[3] = 0;
+            m[4] = (fov/aspect) * 0;       m[5] = fov * yy * sy; m[6] = zy * sy; m[7] = 0;
+            m[8] = (fov/aspect) * xz * sz; m[9] = fov * yz * sz; m[10] = zz * sz; m[11] = 0;
+            m[12] = -cx*m[0] - cy*m[4] - cz*m[8] + px;
+            m[13] = -cx*m[1] - cy*m[5] - cz*m[9] + py;
+            m[14] = (-cx*m[2] - cy*m[6] - cz*m[10])*nf*(near+far) + 2*near*far*nf + pz;
+            m[15] = 1;
+            return m;
         }
 
         function animate() {
             requestAnimationFrame(animate);
 
-            if (!player || !ball) return;
+            // Очистка буфера WebGL
+            gl.clearColor(0.05, 0.05, 0.1, 1.0);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            gl.enable(gl.DEPTH_TEST);
 
-            // 1. Движение игрока
-            if (player.isAlive) {
-                const moveSpeed = 0.22;
-                if (keys.w && player.position.z > -ARENA_SIZE) player.position.z -= moveSpeed;
-                if (keys.s && player.position.z < ARENA_SIZE) player.position.z += moveSpeed;
-                if (keys.a && player.position.x > -ARENA_SIZE) player.position.x -= moveSpeed;
-                if (keys.d && player.position.x < ARENA_SIZE) player.position.x += moveSpeed;
+            // 1. Логика Игрока
+            if (playerAlive) {
+                let speed = 0.2;
+                if (keys.w && playerZ > -ARENA_SIZE) playerZ -= speed;
+                if (keys.s && playerZ < ARENA_SIZE) playerZ += speed;
+                if (keys.a && playerX > -ARENA_SIZE) playerX -= speed;
+                if (keys.d && playerX < ARENA_SIZE) playerX += speed;
             }
 
-            // 2. Движение ботов
-            bots.forEach(bot => {
-                if (!bot.isAlive) return;
-
-                bot.aiTimer--;
-                if (bot.aiTimer <= 0) {
-                    bot.aiTimer = Math.random() * 60 + 30;
-                    bot.moveDir.set(Math.random() * 2 - 1, 0, Math.random() * 2 - 1).normalize();
+            // 2. Логика Ботов
+            bots.forEach((bot, idx) => {
+                if (!bot.alive) return;
+                bot.timer--;
+                if (bot.timer <= 0) {
+                    bot.timer = Math.random() * 60 + 30;
+                    bot.dx = (Math.random() - 0.5) * 0.12;
+                    bot.dz = (Math.random() - 0.5) * 0.12;
                 }
+                bot.x += bot.dx; bot.z += bot.dz;
+                if(bot.x < -ARENA_SIZE) bot.x = -ARENA_SIZE; if(bot.x > ARENA_SIZE) bot.x = ARENA_SIZE;
+                if(bot.z < -ARENA_SIZE) bot.z = -ARENA_SIZE; if(bot.z > ARENA_SIZE) bot.z = ARENA_SIZE;
 
-                bot.position.addScaledVector(bot.moveDir, 0.12);
-                
-                bot.position.x = THREE.MathUtils.clamp(bot.position.x, -ARENA_SIZE + 1, ARENA_SIZE - 1);
-                bot.position.z = THREE.MathUtils.clamp(bot.position.z, -ARENA_SIZE + 1, ARENA_SIZE - 1);
-
-                let distToBall = bot.position.distanceTo(ball.position);
-                if (currentTarget === bot && distToBall < (3.0 + ballSpeed * 5) && !bot.isBlocking) {
-                    let reactionChance = Math.random();
-                    if (reactionChance > (ballSpeed * 0.5 - 0.05)) { 
-                        bot.isBlocking = true;
-                        bot.material.color.setHex(0xffffff);
-                        
-                        setTimeout(() => {
-                            bot.isBlocking = false;
-                            if (bot.isAlive) bot.material.color.setHex(0x9b5de5);
-                        }, 250);
+                // Блок бота
+                let dist = Math.sqrt((bot.x - ballX)**2 + (bot.z - ballZ)**2);
+                if (currentTarget === idx && dist < (3.5 + ballSpeed * 4) && !bot.blocking) {
+                    if (Math.random() > 0.1) {
+                        bot.blocking = true;
+                        setTimeout(() => { bot.blocking = false; }, 250);
                     }
                 }
             });
 
-            // 3. Логика мяча (самонаведение)
-            if (currentTarget && currentTarget.isAlive) {
-                let targetDir = new THREE.Vector3().subVectors(currentTarget.position, ball.position).normalize();
-                ballDirection.lerp(targetDir, 0.08); 
-                ball.position.addScaledVector(ballDirection, ballSpeed);
+            // 3. Логика самонаводящегося мяча
+            let tx = playerX, tz = playerZ;
+            let isTargetBlocking = isBlocking;
 
-                const distance = currentTarget.position.distanceTo(ball.position);
+            if (currentTarget !== 'player' && typeof currentTarget === 'number') {
+                tx = bots[currentTarget].x; tz = bots[currentTarget].z;
+                isTargetBlocking = bots[currentTarget].blocking;
+            }
 
-                if (distance < 3.5) {
-                    let isTargetBlocking = currentTarget.isPlayer ? isBlocking : currentTarget.isBlocking;
+            let dx = tx - ballX, dz = tz - ballZ;
+            let dist = Math.sqrt(dx*dx + dz*dz);
 
-                    if (isTargetBlocking) {
-                        ballSpeed += 0.025;
-                        if (currentTarget.isPlayer) {
-                            score++;
-                            document.getElementById('score').innerText = score;
-                        }
+            if (dist > 0.1) {
+                ballVelX = (dx / dist) * 0.1 + ballVelX * 0.9;
+                ballVelZ = (dz / dist) * 0.1 + ballVelZ * 0.9;
+                let vLen = Math.sqrt(ballVelX*ballVelX + ballVelZ*ballVelZ);
+                ballVelX = (ballVelX / vLen) * ballSpeed;
+                ballVelZ = (ballVelZ / vLen) * ballSpeed;
+            }
+            ballX += ballVelX; ballZ += ballVelZ;
+
+            // Обработка столкновений / блоков
+            if (dist < 3.0) {
+                if (isTargetBlocking) {
+                    ballSpeed += 0.02;
+                    if (currentTarget === 'player') {
+                        score++;
+                        document.getElementById('score').innerText = score;
+                    }
+                    selectNewTarget(currentTarget);
+                } else if (dist < 1.2) {
+                    if (currentTarget === 'player') {
+                        playerAlive = false;
+                        alert(`Вы выбыли! Авто-рестарт.`);
+                        resetGame();
+                    } else {
+                        bots[currentTarget].alive = false;
+                        ballSpeed = Math.max(0.18, ballSpeed - 0.04);
                         selectNewTarget(currentTarget);
-                    } 
-                    else if (distance < 1.4) {
-                        if (currentTarget.isPlayer) {
-                            player.isAlive = false;
-                            alert(`Вы выбыли! Счёт отбиваний: ${score}`);
-                            restartGame();
-                        } else {
-                            currentTarget.isAlive = false;
-                            scene.remove(currentTarget);
-                            ballSpeed = Math.max(0.18, ballSpeed - 0.05);
-                            selectNewTarget();
-                        }
                     }
                 }
-            } else {
-                selectNewTarget();
             }
 
-            // 4. Следование камеры
-            if (player.isAlive) {
-                camera.position.x = THREE.MathUtils.lerp(camera.position.x, player.position.x, 0.08);
-                camera.position.y = THREE.MathUtils.lerp(camera.position.y, player.position.y + 7, 0.08);
-                camera.position.z = THREE.MathUtils.lerp(camera.position.z, player.position.z + 14, 0.08);
-                camera.lookAt(player.position.x, player.position.y + 1, player.position.z - 2);
+            // Настройка динамической 3D Камеры
+            let camX = playerX, camY = 6, camZ = playerZ + 12;
+            let tarX = playerX, tarY = 1, tarZ = playerZ - 2;
+
+            // 4. Отрисовка всех объектов на экране через шейдеры
+            gl.vertexAttribPointer(aPosition, 3, gl.FLOAT, false, 0, 0);
+            gl.enableVertexAttribArray(aPosition);
+
+            // Отрисовка Арены (Плоский Пол)
+            drawObject(0, -0.2, 0, ARENA_SIZE, 0.1, ARENA_SIZE, [0.15, 0.15, 0.22, 1.0], camX, camY, camZ, tarX, tarY, tarZ);
+
+            // Отрисовка Игрока
+            if (playerAlive) {
+                let pColor = isBlocking ? [0.0, 1.0, 0.0, 1.0] : [0.0, 0.67, 0.71, 1.0];
+                drawObject(playerX, 1, playerZ, 0.9, 0.9, 0.9, pColor, camX, camY, camZ, tarX, tarY, tarZ);
             }
 
-            renderer.render(scene, camera);
+            // Отрисовка Ботов
+            bots.forEach(bot => {
+                if (!bot.alive) return;
+                let bColor = bot.blocking ? [1.0, 1.0, 1.0, 1.0] : bot.color;
+                drawObject(bot.x, 1, bot.z, 0.9, 0.9, 0.9, bColor, camX, camY, camZ, tarX, tarY, tarZ);
+            });
+
+            // Отрисовка Мяча
+            drawObject(ballX, ballY, ballZ, 0.7, 0.7, 0.7, [1.0, 0.18, 0.38, 1.0], camX, camY, camZ, tarX, tarY, tarZ);
         }
 
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        // Принудительный запуск
-        init();
+        // Запуск
+        selectNewTarget();
+        animate();
     </script>
 </body>
 </html>
