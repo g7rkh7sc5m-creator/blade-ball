@@ -258,5 +258,11 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// Запуск
-init();
+// Запускаем игру ТОЛЬКО после того, как браузер полностью загрузит Three.js
+window.addEventListener('load', () => {
+    if (typeof THREE !== 'undefined') {
+        init();
+    } else {
+        console.error("Библиотека Three.js не успела прогрузиться. Перезагрузите страницу.");
+    }
+});
