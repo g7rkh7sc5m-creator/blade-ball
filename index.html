@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blade Ball 3D — Real Engine</title>
+    <title>Blade Ball 3D — No Light Fixed Edition</title>
     <style>
         body { margin: 0; overflow: hidden; background: #0a0a14; font-family: sans-serif; user-select: none; }
         #ui {
@@ -14,7 +14,7 @@
         #instructions { font-size: 14px; color: #00adb5; margin-top: 5px; }
         #alive-counter { font-size: 16px; color: #ff2e63; margin-top: 5px; }
     </style>
-    <!-- Подключаем официальную библиотеку Three.js -->
+    <!-- Подключаем стабильную библиотеку Three.js -->
     <script src="https://cloudflare.com"></script>
 </head>
 <body>
@@ -26,7 +26,7 @@
     </div>
 
     <script>
-        // === ЧАСТЬ 1: НАСТРОЙКИ СЦЕНЫ И НАСТОЯЩИЕ 3D ОБЪЕКТЫ ===
+        // === ЧАСТЬ 1: НАСТРОЙКИ СЦЕНЫ И НЕОНОВЫЕ СВЕТЯЩИЕСЯ ОБЪЕКТЫ ===
         let scene, camera, renderer, player, ball;
         let bots = [];
         let currentTarget = null;
@@ -43,7 +43,7 @@
 
         function init() {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x0a0a16);
+            scene.background = new THREE.Color(0x0a0a16); // Тёмно-синий космос
             
             camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             
@@ -51,37 +51,30 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Хорошее освещение, чтобы всё было объёмным
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-            scene.add(ambientLight);
-            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-            dirLight.position.set(10, 30, 10);
-            scene.add(dirLight);
-
-            // Настоящий 3D Пол Арены
+            // ИСПРАВЛЕНО: Пол арены из MeshBasicMaterial. Светится сам, не требует видеокарты и источников света
             const floorGeo = new THREE.BoxGeometry(ARENA_SIZE * 2, 0.5, ARENA_SIZE * 2);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x1f1f2e, roughness: 0.8 });
+            const floorMat = new THREE.MeshBasicMaterial({ color: 0x1f1f2e });
             const floor = new THREE.Mesh(floorGeo, floorMat);
             floor.position.y = -0.25;
             scene.add(floor);
 
-            // Красная светящаяся сетка
+            // Красная неоновая сетка разметки арены
             const grid = new THREE.GridHelper(ARENA_SIZE * 2, 20, 0xff2e63, 0x333344);
             grid.position.y = 0.01;
             scene.add(grid);
 
-            // Игрок (Настоящая 3D сфера персонажа)
-            const playerGeo = new THREE.SphereGeometry(1, 32, 32);
-            const playerMat = new THREE.MeshStandardMaterial({ color: 0x00adb5, roughness: 0.2 });
+            // Игрок (Яркая неоново-синяя 3D-сфера, видна без света!)
+            const playerGeo = new THREE.SphereGeometry(1, 16, 16);
+            const playerMat = new THREE.MeshBasicMaterial({ color: 0x00adb5 });
             player = new THREE.Mesh(playerGeo, playerMat);
             player.position.set(0, 1, 15);
             player.isPlayer = true;
             player.isAlive = true;
             scene.add(player);
 
-            // Смертоносный светящийся 3D мяч
-            const ballGeo = new THREE.SphereGeometry(0.8, 32, 32);
-            const ballMat = new THREE.MeshStandardMaterial({ color: 0xff2e63, emissive: 0xff2e63, emissiveIntensity: 0.5 });
+            // Смертоносный красный 3D мяч (виден без света!)
+            const ballGeo = new THREE.SphereGeometry(0.8, 16, 16);
+            const ballMat = new THREE.MeshBasicMaterial({ color: 0xff2e63 });
             ball = new THREE.Mesh(ballGeo, ballMat);
             ball.position.set(0, 1, -10);
             scene.add(ball);
@@ -99,10 +92,11 @@
         function createBots() {
             bots.forEach(b => scene.remove(b));
             bots = [];
-            const botGeo = new THREE.SphereGeometry(1, 32, 32);
+            const botGeo = new THREE.SphereGeometry(1, 16, 16);
 
             for (let i = 0; i < BOT_COUNT; i++) {
-                const botMat = new THREE.MeshStandardMaterial({ color: 0x9b5de5, roughness: 0.3 });
+                // Боты (Яркие фиолетовые сферы, видны без света!)
+                const botMat = new THREE.MeshBasicMaterial({ color: 0x9b5de5 });
                 const bot = new THREE.Mesh(botGeo, botMat);
                 bot.position.set((Math.random() - 0.5) * (ARENA_SIZE * 1.4), 1, (Math.random() - 0.5) * (ARENA_SIZE * 1.4));
                 bot.isPlayer = false;
@@ -113,7 +107,7 @@
                 bots.push(bot);
                 scene.add(bot);
             }
-        }        // === ЧАСТЬ 2: УПРАВЛЕНИЕ, ФИЗИКА, ИИ И ЦИКЛ ОТРИСОВКИ ===
+        }        // === ЧАСТЬ 2: ЛОГИКА ИГРЫ, ИИ БОТОВ И ИСПРАВЛЕННЫЙ ИГРОВОЙ ЦИКЛ ===
         function selectNewTarget(exception) {
             let pool = [];
             if (player && player.isAlive && player !== exception) pool.push(player);
@@ -183,7 +177,7 @@
         function triggerPlayerBlock() {
             isBlocking = true;
             blockCooldown = true;
-            player.material.color.setHex(0x00ff00); // Зеленый щит при нажатии пробела
+            player.material.color.setHex(0x00ff00); // Зеленый цвет щита
 
             setTimeout(() => {
                 isBlocking = false;
@@ -191,7 +185,7 @@
                 else player.material.color.setHex(0x00adb5);
                 
                 setTimeout(() => { blockCooldown = false; }, 400);
-            }, 300); // Окно блока длится 300мс
+            }, 300); // Блок активен 300мс
         }
 
         function animate() {
@@ -208,7 +202,7 @@
                 if (keys.d && player.position.x < ARENA_SIZE) player.position.x += moveSpeed;
             }
 
-            // 2. Логика ИИ ботов (Передвижение + авто-блок)
+            // 2. Движение и авто-блок ботов
             bots.forEach(bot => {
                 if (!bot.isAlive) return;
 
@@ -228,7 +222,7 @@
                     let reactionChance = Math.random();
                     if (reactionChance > (ballSpeed * 0.5 - 0.05)) { 
                         bot.isBlocking = true;
-                        bot.material.color.setHex(0xffffff); // Белая вспышка щита бота
+                        bot.material.color.setHex(0xffffff); // Белая вспышка блока бота
                         
                         setTimeout(() => {
                             bot.isBlocking = false;
@@ -238,7 +232,7 @@
                 }
             });
 
-            // 3. Физика самонаводящегося мяча (Следование по дуге)
+            // 3. Логика преследования мяча
             if (currentTarget && currentTarget.isAlive) {
                 let targetDir = new THREE.Vector3().subVectors(currentTarget.position, ball.position).normalize();
                 ballDirection.lerp(targetDir, 0.08); 
@@ -246,12 +240,11 @@
 
                 const distance = currentTarget.position.distanceTo(ball.position);
 
-                // Обработка столкновения
                 if (distance < 3.5) {
                     let isTargetBlocking = currentTarget.isPlayer ? isBlocking : currentTarget.isBlocking;
 
                     if (isTargetBlocking) {
-                        ballSpeed += 0.025; // Мяч ускоряется при каждом успешном блоке
+                        ballSpeed += 0.025; // Мяч ускоряется
                         if (currentTarget.isPlayer) {
                             score++;
                             document.getElementById('score').innerText = score;
@@ -275,7 +268,7 @@
                 selectNewTarget();
             }
 
-            // 4. Следование 3D-камеры от третьего лица за игроком
+            // 4. Следование 3D-камеры
             if (player.isAlive) {
                 camera.position.x = THREE.MathUtils.lerp(camera.position.x, player.position.x, 0.08);
                 camera.position.y = THREE.MathUtils.lerp(camera.position.y, player.position.y + 6, 0.08);
@@ -292,7 +285,7 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
-        // Запуск движка
+        // Жесткий запуск игрового мира
         init();
     </script>
 </body>
