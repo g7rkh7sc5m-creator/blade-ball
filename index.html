@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blade Ball 3D — One File Engine</title>
+    <title>Blade Ball 3D — Real Roblox Style</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #050510; font-family: sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #0a0a14; font-family: sans-serif; user-select: none; }
         #ui {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
             color: white; font-size: 24px; font-weight: bold; pointer-events: none;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.9); text-align: center; z-index: 10;
+            text-shadow: 2px 2px 5px rgba(0,0,0,0.9); text-align: center; z-index: 10;
         }
         #instructions { font-size: 14px; color: #00adb5; margin-top: 5px; }
         #alive-counter { font-size: 16px; color: #ff2e63; margin-top: 5px; }
-        canvas { display: block; width: 100vw; height: 100vh; }
     </style>
+    <!-- Подключаем официальную стабильную библиотеку Three.js -->
+    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
@@ -24,81 +25,97 @@
         <div id="instructions">WASD / Стрелки — движение | ПРОБЕЛ — блок вовремя</div>
     </div>
 
-    <canvas id="gameCanvas"></canvas>
-
     <script>
-        // === ЧАСТЬ 1: ВСТРОЕННЫЙ АВТОНОМНЫЙ 3D-ДВИЖОК ===
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
-
-        function resizeCanvas() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.addEventListener('resize', resizeCanvas);
-        resizeCanvas();
-
-        // 3D Векторы и Математика
-        class Vector3 {
-            constructor(x = 0, y = 0, z = 0) { this.x = x; this.y = y; this.z = z; }
-            set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; }
-            addScaledVector(v, s) { this.x += v.x * s; this.y += v.y * s; this.z += v.z * s; return this; }
-            distanceTo(v) { return Math.sqrt((this.x - v.x)**2 + (this.y - v.y)**2 + (this.z - v.z)**2); }
-            normalize() { let l = Math.sqrt(this.x**2 + this.y**2 + this.z**2) || 1; this.x /= l; this.y /= l; this.z /= l; return this; }
-            subVectors(a, b) { this.x = a.x - b.x; this.y = a.y - b.y; this.z = a.z - b.z; return this; }
-            lerp(v, alpha) { this.x += (v.x - this.x) * alpha; this.y += (v.y - this.y) * alpha; this.z += (v.z - this.z) * alpha; return this; }
-            clone() { return new Vector3(this.x, this.y, this.z); }
-        }
-
-        // Проекция 3D объектов на 2D экран без WebGL (Никаких серых экранов!)
-        function projectToScreen(pos, cam) {
-            let relX = pos.x - cam.position.x;
-            let relY = pos.y - (cam.position.y - 1.5); // Коррекция высоты взгляда
-            let relZ = pos.z - cam.position.z;
-
-            // Масштабирование перспективы
-            let fov = 350;
-            let scale = fov / (relZ + fov);
-            if (scale < 0) return null;
-
-            let sx = canvas.width / 2 + relX * scale * 25;
-            let sy = canvas.height / 2 - relY * scale * 25;
-
-            return { x: sx, y: sy, size: scale * 30 };
-        }
-
-        // Параметры геймплея
-        let camera = { position: new Vector3() };
-        let player = { position: new Vector3(0, 0.8, 14), isAlive: true, color: '#00adb5' };
-        let ball = { position: new Vector3(0, 0.8, -12), color: '#ff2e63' };
-        let ballDirection = new Vector3();
-        
+        // === ЧАСТЬ 1: НАСТРОЙКИ СЦЕНЫ И ГЕНЕРАЦИЯ ОБЪЕКТОВ ===
+        let scene, camera, renderer, player, ball;
         let bots = [];
         let currentTarget = null;
+        
         let keys = { w: false, a: false, s: false, d: false, Space: false };
         let ballSpeed = 0.18;
+        let ballDirection = new THREE.Vector3();
         let score = 0;
         let isBlocking = false;
         let blockCooldown = false;
 
-        const ARENA_SIZE = 24;
+        const ARENA_SIZE = 25;
         const BOT_COUNT = 3;
 
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0a0a16);
+            
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            document.body.appendChild(renderer.domElement);
+
+            // Настоящее 3D освещение
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 30, 10);
+            scene.add(dirLight);
+
+            // Настоящий 3D Пол Арены
+            const floorGeo = new THREE.BoxGeometry(ARENA_SIZE * 2, 0.5, ARENA_SIZE * 2);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x1f1f2e, roughness: 0.8 });
+            const floor = new THREE.Mesh(floorGeo, floorMat);
+            floor.position.y = -0.25;
+            scene.add(floor);
+
+            // Сетка разметки
+            const grid = new THREE.GridHelper(ARENA_SIZE * 2, 20, 0xff2e63, 0x333344);
+            grid.position.y = 0.01;
+            scene.add(grid);
+
+            // Игрок (3D сфера персонажа)
+            const playerGeo = new THREE.SphereGeometry(1, 32, 32);
+            const playerMat = new THREE.MeshStandardMaterial({ color: 0x00adb5, roughness: 0.2 });
+            player = new THREE.Mesh(playerGeo, playerMat);
+            player.position.set(0, 1, 15);
+            player.isPlayer = true;
+            player.isAlive = true;
+            scene.add(player);
+
+            // Смертоносный 3D мяч с эффектом свечения
+            const ballGeo = new THREE.SphereGeometry(0.8, 32, 32);
+            const ballMat = new THREE.MeshStandardMaterial({ color: 0xff2e63, emissive: 0xff2e63, emissiveIntensity: 0.5 });
+            ball = new THREE.Mesh(ballGeo, ballMat);
+            ball.position.set(0, 1, -10);
+            scene.add(ball);
+
+            createBots();
+
+            window.addEventListener('keydown', (e) => handleInput(e, true));
+            window.addEventListener('keyup', (e) => handleInput(e, false));
+            window.addEventListener('resize', onWindowResize);
+
+            selectNewTarget();
+            animate();
+        }
+
         function createBots() {
+            bots.forEach(b => scene.remove(b));
             bots = [];
+            const botGeo = new THREE.SphereGeometry(1, 32, 32);
+
             for (let i = 0; i < BOT_COUNT; i++) {
-                bots.push({
-                    position: new Vector3((Math.random() - 0.5) * (ARENA_SIZE * 1.3), 0.8, (Math.random() - 0.5) * (ARENA_SIZE * 1.3)),
-                    isAlive: true,
-                    aiTimer: 0,
-                    moveDir: new Vector3(),
-                    isBlocking: false,
-                    color: '#9b5de5'
-                });
+                const botMat = new THREE.MeshStandardMaterial({ color: 0x9b5de5, roughness: 0.3 });
+                const bot = new THREE.Mesh(botGeo, botMat);
+                bot.position.set((Math.random() - 0.5) * (ARENA_SIZE * 1.4), 1, (Math.random() - 0.5) * (ARENA_SIZE * 1.4));
+                bot.isPlayer = false;
+                bot.isAlive = true;
+                bot.aiTimer = 0;
+                bot.moveDir = new THREE.Vector3();
+                bot.isBlocking = false;
+                bots.push(bot);
+                scene.add(bot);
             }
-        }        function selectNewTarget(exception) {
+        }      function selectNewTarget(exception) {
             let pool = [];
-            if (player.isAlive && player !== exception) pool.push(player);
+            if (player && player.isAlive && player !== exception) pool.push(player);
             bots.forEach(b => {
                 if (b.isAlive && b !== exception) pool.push(b);
             });
@@ -109,11 +126,11 @@
 
             if (pool.length > 0) {
                 currentTarget = pool[Math.floor(Math.random() * pool.length)];
-                bots.forEach(b => { if (b.isAlive) b.color = '#9b5de5'; });
-                if (player.isAlive && !isBlocking) player.color = '#00adb5';
+                bots.forEach(b => { if(b.isAlive) b.material.color.setHex(0x9b5de5); });
+                if (player && player.isAlive && !isBlocking) player.material.color.setHex(0x00adb5);
                 
                 if (currentTarget !== player) {
-                    currentTarget.color = '#ff9f1c';
+                    currentTarget.material.color.setHex(0xff9f1c);
                 }
             } else {
                 currentTarget = null;
@@ -122,23 +139,24 @@
         }
 
         function updateAliveCounter() {
-            let count = (player.isAlive ? 1 : 0) + bots.filter(b => b.isAlive).length;
+            let count = ((player && player.isAlive) ? 1 : 0) + bots.filter(b => b.isAlive).length;
             document.getElementById('bots-count').innerText = count;
             
-            if (count === 1 && player.isAlive) {
+            if (count === 1 && player && player.isAlive) {
                 alert("ПОБЕДА! Вы уничтожили всех ботов!");
                 restartGame();
             }
         }
 
         function restartGame() {
+            if (!player || !ball) return;
             player.isAlive = true;
-            player.position.set(0, 0.8, 14);
-            player.color = '#00adb5';
+            player.position.set(0, 1, 15);
+            player.material.color.setHex(0x00adb5);
             
             createBots();
             
-            ball.position.set(0, 0.8, -12);
+            ball.position.set(0, 1, -10);
             ballSpeed = 0.18;
             score = 0;
             document.getElementById('score').innerText = score;
@@ -146,7 +164,7 @@
             selectNewTarget();
         }
 
-        window.addEventListener('keydown', (e) => {
+        function handleInput(e, isDown) {
             let key = e.key.toLowerCase();
             if (e.code === 'Space') key = 'Space';
             if (e.key === 'ArrowUp') key = 'w';
@@ -154,37 +172,31 @@
             if (e.key === 'ArrowLeft') key = 'a';
             if (e.key === 'ArrowRight') key = 'd';
 
-            if (keys.hasOwnProperty(key)) keys[key] = true;
+            if (keys.hasOwnProperty(key)) keys[key] = isDown;
 
-            if (key === 'Space' && !blockCooldown && !isBlocking && player.isAlive) {
-                isBlocking = true;
-                blockCooldown = true;
-                player.color = '#00ff00';
-
-                setTimeout(() => {
-                    isBlocking = false;
-                    if (currentTarget === player) player.color = '#ff9f1c';
-                    else player.color = '#00adb5';
-                    
-                    setTimeout(() => { blockCooldown = false; }, 400);
-                }, 300);
+            if (key === 'Space' && isDown && !blockCooldown && !isBlocking && player && player.isAlive) {
+                triggerPlayerBlock();
             }
-        });
+        }
 
-        window.addEventListener('keyup', (e) => {
-            let key = e.key.toLowerCase();
-            if (e.key === 'ArrowUp') key = 'w';
-            if (e.key === 'ArrowDown') key = 's';
-            if (e.key === 'ArrowLeft') key = 'a';
-            if (e.key === 'ArrowRight') key = 'd';
-            if (keys.hasOwnProperty(key)) keys[key] = false;
-        });
+        function triggerPlayerBlock() {
+            isBlocking = true;
+            blockCooldown = true;
+            player.material.color.setHex(0x00ff00);
 
-        function gameLoop() {
-            requestAnimationFrame(gameLoop);
+            setTimeout(() => {
+                isBlocking = false;
+                if (currentTarget === player) player.material.color.setHex(0xff9f1c);
+                else player.material.color.setHex(0x00adb5);
+                
+                setTimeout(() => { blockCooldown = false; }, 400);
+            }, 300);
+        }
 
-            ctx.fillStyle = '#060612';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (!player || !ball) return;
 
             if (player.isAlive) {
                 const moveSpeed = 0.22;
@@ -204,48 +216,51 @@
                 }
 
                 bot.position.addScaledVector(bot.moveDir, 0.12);
+                
                 bot.position.x = Math.max(-ARENA_SIZE + 1, Math.min(ARENA_SIZE - 1, bot.position.x));
                 bot.position.z = Math.max(-ARENA_SIZE + 1, Math.min(ARENA_SIZE - 1, bot.position.z));
 
                 let distToBall = bot.position.distanceTo(ball.position);
-                if (currentTarget === bot && distToBall < (3.5 + ballSpeed * 5) && !bot.isBlocking) {
-                    if (Math.random() > 0.15) { 
+                if (currentTarget === bot && distToBall < (3.0 + ballSpeed * 5) && !bot.isBlocking) {
+                    let reactionChance = Math.random();
+                    if (reactionChance > (ballSpeed * 0.5 - 0.05)) { 
                         bot.isBlocking = true;
-                        bot.color = '#ffffff';
+                        bot.material.color.setHex(0xffffff);
                         
                         setTimeout(() => {
                             bot.isBlocking = false;
-                            if (bot.isAlive) bot.color = '#9b5de5';
+                            if (bot.isAlive) bot.material.color.setHex(0x9b5de5);
                         }, 250);
                     }
                 }
             });
 
             if (currentTarget && currentTarget.isAlive) {
-                let targetDir = new Vector3().subVectors(currentTarget.position, ball.position).normalize();
+                let targetDir = new THREE.Vector3().subVectors(currentTarget.position, ball.position).normalize();
                 ballDirection.lerp(targetDir, 0.08); 
                 ball.position.addScaledVector(ballDirection, ballSpeed);
 
-                const distance = ball.position.distanceTo(currentTarget.position);
+                const distance = currentTarget.position.distanceTo(ball.position);
 
                 if (distance < 3.5) {
-                    let isTargetBlocking = (currentTarget === player) ? isBlocking : currentTarget.isBlocking;
+                    let isTargetBlocking = currentTarget.isPlayer ? isBlocking : currentTarget.isBlocking;
 
                     if (isTargetBlocking) {
                         ballSpeed += 0.025;
-                        if (currentTarget === player) {
+                        if (currentTarget.isPlayer) {
                             score++;
                             document.getElementById('score').innerText = score;
                         }
                         selectNewTarget(currentTarget);
                     } 
-                    else if (distance < 1.3) {
-                        if (currentTarget === player) {
+                    else if (distance < 1.4) {
+                        if (currentTarget.isPlayer) {
                             player.isAlive = false;
                             alert(`Вы выбыли! Счёт отбиваний: ${score}`);
                             restartGame();
                         } else {
                             currentTarget.isAlive = false;
+                            scene.remove(currentTarget);
                             ballSpeed = Math.max(0.18, ballSpeed - 0.05);
                             selectNewTarget();
                         }
@@ -256,71 +271,22 @@
             }
 
             if (player.isAlive) {
-                camera.position.x = player.position.x;
-                camera.position.y = player.position.y + 6;
-                camera.position.z = player.position.z + 11;
+                camera.position.x = THREE.MathUtils.lerp(camera.position.x, player.position.x, 0.08);
+                camera.position.y = THREE.MathUtils.lerp(camera.position.y, player.position.y + 6, 0.08);
+                camera.position.z = THREE.MathUtils.lerp(camera.position.z, player.position.z + 12, 0.08);
+                camera.lookAt(player.position.x, player.position.y + 1, player.position.z - 2);
             }
 
-            ctx.strokeStyle = '#22223b';
-            ctx.lineWidth = 1;
-            for (let i = -ARENA_SIZE; i <= ARENA_SIZE; i += 4) {
-                let p1 = projectToScreen(new Vector3(-ARENA_SIZE, 0, i), camera);
-                let p2 = projectToScreen(new Vector3(ARENA_SIZE, 0, i), camera);
-                if (p1 && p2) { ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke(); }
-
-                let p3 = projectToScreen(new Vector3(i, 0, -ARENA_SIZE), camera);
-                let p4 = projectToScreen(new Vector3(i, 0, ARENA_SIZE), camera);
-                if (p3 && p4) { ctx.beginPath(); ctx.moveTo(p3.x, p3.y); ctx.lineTo(p4.x, p4.y); ctx.stroke(); }
-            }
-
-            let renderQueue = [];
-            bots.forEach(b => { if (b.isAlive) renderQueue.push({ type: 'bot', obj: b, z: b.position.z }); });
-            if (player.isAlive) renderQueue.push({ type: 'player', obj: player, z: player.position.z });
-            renderQueue.push({ type: 'ball', obj: ball, z: ball.position.z });
-
-            renderQueue.sort((a, b) => b.z - a.z);
-
-            renderQueue.forEach(item => {
-                let screen = projectToScreen(item.obj.position, camera);
-                if (!screen) return;
-
-                if (item.type === 'player' || item.type === 'bot') {
-                    ctx.fillStyle = 'rgba(0,0,0,0.4)';
-                    ctx.beginPath();
-                    ctx.ellipse(screen.x, screen.y + screen.size*0.4, screen.size*0.8, screen.size*0.25, 0, 0, Math.PI*2);
-                    ctx.fill();
-
-                    ctx.fillStyle = item.obj.color;
-                    ctx.beginPath();
-                    ctx.arc(screen.x, screen.y, screen.size * 0.7, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.strokeStyle = 'rgba(0,0,0,0.3)';
-                    ctx.lineWidth = 2;
-                    ctx.stroke();
-                } 
-                else if (item.type === 'ball') {
-                    let bBounce = Math.abs(Math.sin(Date.now() * 0.005)) * 1.5;
-                    let ballPos = item.obj.position.clone();
-                    ballPos.y += bBounce;
-                    
-                    let sBall = projectToScreen(ballPos, camera);
-                    if (!sBall) return;
-
-                    ctx.shadowColor = '#ff2e63';
-                    ctx.shadowBlur = 15;
-
-                    ctx.fillStyle = item.obj.color;
-                    ctx.beginPath();
-                    ctx.arc(sBall.x, sBall.y, sBall.size * 0.5, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    ctx.shadowBlur = 0;
-                }
-            });
+            renderer.render(scene, camera);
         }
 
-        restartGame();
-        gameLoop();
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        init();
     </script>
 </body>
 </html>
