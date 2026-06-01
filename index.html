@@ -172,13 +172,28 @@
                 ctx.beginPath(); ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI*2); ctx.fillStyle = ballColor; ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 2; ctx.stroke();
                 let dst = Math.hypot(currentTarget.x - ball.x, currentTarget.y - ball.y);
                 if (dst < currentTarget.radius + ball.radius) {
-                    if (currentTarget.isPlayer) {
-                        if (isBlocking) { score++; coins += 3; document.getElementById('score').innerText = score; document.getElementById('coins').innerText = coins; ballSpeed += 0.65; cParry(ball.x, ball.y, player.weaponData ? player.weaponData.type : 'normal'); selectNewTarget(player); saveProgress(); } 
-                        else { cDeath(player.x, player.y, 'fire'); player.isAlive = false; player.inMatch = false; document.getElementById('danger-alert').style.display = 'none'; selectNewTarget(player); setTimeout(() => { player.isAlive = true; player.x = 400; player.y = 620; }, 1000); }
-                    } else { if (currentTarget.isBlocking) { selectNewTarget(currentTarget); } else { cDeath(currentTarget.x, currentTarget.y, currentKillEffect); currentTarget.isAlive = false; selectNewTarget(currentTarget); } }
-                }
-            }
-
+                                        if (currentTarget.isPlayer) {
+                        if (isBlocking) { 
+                            score++; coins += 3; 
+                            document.getElementById('score').innerText = score; 
+                            document.getElementById('coins').innerText = coins; 
+                            ballSpeed += 0.65; 
+                            
+                            // ИСПРАВЛЕНО: Безопасно проверяем тип оружия, кулаки больше не ломают игру!
+                            let wType = (player.weaponData && player.weaponData.type) ? player.weaponData.type : 'normal';
+                            cParry(ball.x, ball.y, wType); 
+                            
+                            selectNewTarget(player); 
+                            saveProgress(); 
+                        } else { 
+                            cDeath(player.x, player.y, 'fire'); 
+                            player.isAlive = false; player.inMatch = false; 
+                            document.getElementById('danger-alert').style.display = 'none'; 
+                            selectNewTarget(player); 
+                            setTimeout(() => { player.isAlive = true; player.x = 400; player.y = 660; }, 1000); 
+                        }
+                    }
+                    
             for (let i = dParts.length - 1; i >= 0; i--) { let p = dParts[i]; p.x += p.vx; p.y += p.vy; p.alpha -= p.decay; if (p.alpha <= 0) { dParts.splice(i, 1); continue; } ctx.save(); ctx.globalAlpha = p.alpha; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fillStyle = p.color; ctx.fill(); ctx.restore(); }
             for (let i = pParts.length - 1; i >= 0; i--) { let p = pParts[i]; p.x += p.vx; p.y += p.vy; p.alpha -= p.decay; if (p.alpha <= 0) { pParts.splice(i, 1); continue; } ctx.save(); ctx.globalAlpha = p.alpha; ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fillStyle = p.color; ctx.fill(); ctx.restore(); }
             drawCharacter(player); bots.forEach(drawCharacter); requestAnimationFrame(update);
