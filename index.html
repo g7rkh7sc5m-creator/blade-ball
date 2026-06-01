@@ -118,8 +118,8 @@
         });
         window.addEventListener('keyup', (e) => {
             let k = e.key.toLowerCase(); if (k === 'w' || e.key === 'ArrowUp') keys.w = false; if (k === 's' || e.key === 'ArrowDown') keys.s = false; if (k === 'a' || e.key === 'ArrowLeft') keys.a = false; if (k === 'd' || e.key === 'ArrowRight') keys.d = false;
-        });        const wCrate = { x: 120, y: 600, r: 35 }, bCrate = { x: 400, y: 620, r: 35 }, eCrate = { x: 680, y: 600, r: 35 };
-
+        });    const wCrate = { x: 120, y: 600, r: 35 }, bCrate = { x: 540, y: 600, r: 35 }, eCrate = { x: 690, y: 600, r: 35 };
+        
         function update() {
             ctx.fillStyle = '#090a14'; ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#121424'; ctx.fillRect(0, 480, canvas.width, canvas.height - 480);
