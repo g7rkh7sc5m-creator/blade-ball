@@ -44,12 +44,27 @@
         }        function cDeath(x, y, t) {
             let c = ['#ff4500','#ff8c00','#fee440']; if(t==='lightning') c=['#00ffff','#ffffff']; if(t==='void') c=['#4b0082','#9400d3']; if(t==='party') c=['#ff007f','#00f5d4','#9b5de5'];
             for(let i=0;i<50;i++) dParts.push({x,y,vx:(Math.random()-0.5)*(t==='lightning'?12:6),vy:(Math.random()-0.5)*(t==='lightning'?12:6),radius:Math.random()*4+2,color:c[Math.floor(Math.random()*c.length)],alpha:1,decay:Math.random()*0.02+0.015});
+        }        function cParry(x, y, t) {
+            let c = ['#ffffff', '#00ffff']; // Дефолтные искры для кулаков
+            if (t === 'sword') c = ['#00ff00', '#77ff77', '#ffffff'];
+            if (t === 'axe') c = ['#fee440', '#ffaa00', '#ffffff'];
+            if (t === 'banana') c = ['#f15bb5', '#fee440', '#ffc0cb'];
+            if (t === 'spear') c = ['#00adb5', '#00ffff', '#ffffff'];
+            
+            // Спавним 25 жирных частиц, ничего не урезаем!
+            for (let i = 0; i < 25; i++) { 
+                pParts.push({
+                    x: x, y: y, 
+                    vx: (Math.random() - 0.5) * 8, 
+                    vy: (Math.random() - 0.5) * 8, 
+                    radius: Math.random() * 3 + 2, 
+                    color: c[Math.floor(Math.random() * c.length)], 
+                    alpha: 1, 
+                    decay: Math.random() * 0.03 + 0.02 
+                }); 
+            }
         }
-        function cParry(x, y, t) {
-            let c = ['#00ff00']; if(t==='axe') c=['#fee440','#ffaa00']; if(t==='banana') c=['#f15bb5']; if(t==='spear') c=['#00adb5'];
-            for(let i=0;i<20;i++) pParts.push({x,y,vx:(Math.random()-0.5)*8,vy:(Math.random()-0.5)*8,radius:Math.random()*3+2,color:c[Math.floor(Math.random()*c.length)],alpha:1,decay:Math.random()*0.03+0.02});
-        }
-
+        
         function openCrate(t) {
             if (isOpeningCrate) return; let p = t === 'ball' ? 30 : (t === 'weapon' ? 50 : 75);
             if (coins < p) { alert(`Не хватает монет! Надо: ${p} 💰`); return; }
