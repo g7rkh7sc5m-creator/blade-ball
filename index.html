@@ -3,110 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Blade Ball 3D — 100% Fixed One File</title>
+    <title>Blade Ball 2.5D — Brawl Stars Style</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #0a0a14; font-family: sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #070714; font-family: 'Arial Black', sans-serif; user-select: none; }
         #ui {
             position: absolute; top: 20px; left: 50%; transform: translateX(-50%);
-            color: white; font-size: 24px; font-weight: bold; pointer-events: none;
-            text-shadow: 2px 2px 5px rgba(0,0,0,0.9); text-align: center; z-index: 10;
+            color: white; font-size: 26px; text-transform: uppercase; pointer-events: none;
+            text-shadow: 3px 3px 0px #000; text-align: center; z-index: 10; letter-spacing: 1px;
         }
-        #instructions { font-size: 14px; color: #00adb5; margin-top: 5px; }
-        #alive-counter { font-size: 16px; color: #ff2e63; margin-top: 5px; }
+        #instructions { font-size: 13px; color: #00adb5; margin-top: 5px; text-shadow: 1px 1px 0px #000; }
+        #alive-counter { font-size: 18px; color: #ff2e63; margin-top: 5px; }
+        #danger-alert { 
+            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            color: #ff2e63; font-size: 32px; display: none; text-shadow: 2px 2px 0px #000;
+            animation: blink 0.3s infinite alternate; font-weight: bold;
+        }
+        @keyframes blink { from { opacity: 0.3; } to { opacity: 1; } }
     </style>
-    <!-- ВСТРОЕННОЕ ЯДРО THREE.JS — РАБОТАЕТ ВЕЗДЕ БЕЗ ОШИБОК И ИНТЕРНЕТА -->
-    <script>
-        !function(E,R){"object"==typeof exports&&"undefined"!=typeof module?R(exports):"function"==typeof define&&define.amd?define(["exports"],R):R((E=E||self).THREE={})}(this,function(E){"use strict";
-        E.Vector3=function(x,y,z){this.x=x||0,this.y=y||0,this.z=z||0};E.Vector3.prototype={set:function(x,y,z){this.x=x;this.y=y;this.z=z;return this},addScaledVector:function(v,s){this.x+=v.x*s;this.y+=v.y*s;this.z+=v.z*s;return this},distanceTo:function(v){return Math.sqrt((this.x-v.x)**2+(this.y-v.y)**2+(this.z-v.z)**2)},normalize:function(){let l=Math.sqrt(this.x**2+this.y**2+this.z**2)||1;this.x/=l;this.y/=l;this.z/=l;return this},subVectors:function(a,b){this.x=a.x-b.x;this.y=a.y-b.y;this.z=a.z-b.z;return this},lerp:function(v,a){this.x+=(v.x-this.x)*a;this.y+=(v.y-this.y)*a;this.z+=(v.z-this.z)*a;return this},clone:function(){return new E.Vector3(this.x,this.y,this.z)}};
-        E.Scene=function(){this.children=[]};E.Scene.prototype={add:function(o){this.children.push(o)},remove:function(o){let i=this.children.indexOf(o);if(i!==-1)this.children.splice(i,1)}};
-        E.PerspectiveCamera=function(f,a,n,x){this.position=new E.Vector3();this.target=new E.Vector3()};E.PerspectiveCamera.prototype={lookAt:function(x,y,z){this.target.set(x,y,z)},updateProjectionMatrix:function(){}};
-        E.MeshBasicMaterial=function(p){this.color={hex:p&&p.color?p.color:0xffffff,setHex:function(h){this.hex=h}}};
-        E.BoxGeometry=function(w,h,d){this.w=w;this.h=h;this.d=d;this.type="box"};E.SphereGeometry=function(r){this.w=r*2;this.h=r*2;this.d=r*2;this.type="sphere"};
-        E.Mesh=function(g,m){this.geometry=g;this.material=m;this.position=new E.Vector3()};
-        E.WebGLRenderer=function(){let c=document.createElement("canvas");this.domElement=c;this.ctx=c.getContext("2d")};
-        E.WebGLRenderer.prototype={setSize:function(w,h){this.domElement.width=w;this.domElement.height=h},render:function(sc,ca){
-            let c=this.domElement,ctx=this.ctx,w=c.width,h=c.height;
-            ctx.fillStyle="#050510";ctx.fillRect(0,0,w,h);
-            let fov=400,cx=ca.position.x,cy=ca.position.y,cz=ca.position.z;
-            let renderList=sc.children.slice().sort((a,b)=>b.position.z-a.position.z);
-            for(let i=0;i<renderList.length;i++){
-                let o=renderList[i];let rx=o.position.x-cx,ry=o.position.y-(cy-1.5),rz=o.position.z-cz;
-                let sz=fov/(rz+fov);if(sz<0)continue;
-                let sx=w/2+rx*sz*22,sy=h/2-ry*sz*22;
-                let sw=o.geometry.w*sz*22,sh=o.geometry.h*sz*22;
-                ctx.fillStyle="#"+("000000"+o.material.color.hex.toString(16)).slice(-6);
-                if(o.geometry.w>40){
-                    ctx.strokeStyle="#ff2e63";ctx.lineWidth=2;
-                    for(let g=-24;g<=24;g+=4){
-                        let x1=w/2+(g-cx)*sz*22,y1=h/2-(0-cy+1.5)*sz*22;
-                        ctx.beginPath();ctx.arc(sx,sy,1,0,Math.PI*2);ctx.stroke();
-                    }
-                    ctx.strokeRect(w/2-sw/2,sy-sh/2,sw,sh);
-                }else{
-                    ctx.beginPath();
-                    if(o.geometry.type==="sphere"){ctx.arc(sx,sy,sw/2,0,Math.PI*2);}
-                    else{ctx.rect(sx-sw/2,sy-sh/2,sw,sh);}
-                    ctx.fill();ctx.shadowColor=ctx.fillStyle;ctx.shadowBlur=5;ctx.strokeStyle="rgba(0,0,0,0.4)";ctx.lineWidth=2;ctx.stroke();ctx.shadowBlur=0;
-                }
-            }
-        },MathUtils:{lerp:function(x,y,t){return(1-t)*x+t*y}}};
-        });
-    </script>
+    <!-- Стабильная библиотека Three.js -->
+    <script src="https://cloudflare.com"></script>
 </head>
 <body>
 
     <div id="ui">
-        Счёт отбиваний: <span id="score">0</span>
-        <div id="alive-counter">Осталось бойцов: <span id="bots-count">4</span></div>
-        <div id="instructions">WASD / Стрелки — движение | ПРОБЕЛ — блок вовремя</div>
+        ОТБИТО: <span id="score">0</span>
+        <div id="alive-counter">ОСТАЛОСЬ БОЙЦОВ: <span id="bots-count">4</span></div>
+        <div id="instructions">WASD / Стрелки — бег | ПРОБЕЛ — блок / парирование</div>
     </div>
+    
+    <div id="danger-alert">МЯЧ ЛЕТИТ В ТЕБЯ! БЛОКИРУЙ!</div>
 
-    <script>
-        // === НАСТРОЙКИ ИГРЫ И ГЕНЕРАЦИЯ ОБЪЕКТОВ ===
-        let scene, camera, renderer, player, ball;
+    <script>        let scene, camera, renderer, player, ball;
         let bots = [];
         let currentTarget = null;
+        let ballTrail = [];
+        const MAX_TRAIL = 8;
         
         let keys = { w: false, a: false, s: false, d: false, Space: false };
-        let ballSpeed = 0.18;
-        let ballDirection = new THREE.Vector3();
+        let ballSpeed = 0.22;
         let score = 0;
         let isBlocking = false;
         let blockCooldown = false;
 
         const ARENA_SIZE = 25;
-        const BOT_COUNT = 3;
+        const BOT_COUNT = 4;
 
         function init() {
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            scene.background = new THREE.Color(0x0a0a1a);
             
-            renderer = new THREE.WebGLRenderer();
+            // КАМЕРА В СТИЛЕ BRAWL STARS
+            camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 32, 28); 
+            camera.lookAt(0, -2, 4);        
+            
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true; 
             document.body.appendChild(renderer.domElement);
 
-            // Пол Арены (Настоящая 3D коробка под ногами)
-            const floorGeo = new THREE.BoxGeometry(ARENA_SIZE * 2, 0.2, ARENA_SIZE * 2);
-            const floorMat = new THREE.MeshBasicMaterial({ color: 0x1a1a2e });
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 40, 20);
+            scene.add(dirLight);
+
+            const floorGeo = new THREE.BoxGeometry(ARENA_SIZE * 2, 1, ARENA_SIZE * 2);
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x16192b, roughness: 0.4 });
             const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.position.set(0, -0.1, 0);
+            floor.position.y = -0.5;
             scene.add(floor);
 
-            // Игрок (Светящаяся неоново-синяя сфера)
-            const playerGeo = new THREE.SphereGeometry(1);
-            const playerMat = new THREE.MeshBasicMaterial({ color: 0x00adb5 });
-            player = new THREE.Mesh(playerGeo, playerMat);
-            player.position.set(0, 1, 14);
+            const grid = new THREE.GridHelper(ARENA_SIZE * 2, 16, 0x00adb5, 0x222538);
+            grid.position.y = 0.02;
+            scene.add(grid);
+
+            player = createCharacter(0x00adb5);
+            player.position.set(0, 0, 14);
             player.isPlayer = true;
             player.isAlive = true;
             scene.add(player);
 
-            // Мяч-убийца (Красная сфера)
-            const ballGeo = new THREE.SphereGeometry(0.8);
-            const ballMat = new THREE.MeshBasicMaterial({ color: 0xff2e63 });
+            const ballGeo = new THREE.SphereGeometry(0.9, 16, 16);
+            const ballMat = new THREE.MeshBasicMaterial({ color: 0xff0055 });
             ball = new THREE.Mesh(ballGeo, ballMat);
-            ball.position.set(0, 1, -12);
+            ball.position.set(0, 1.2, -12);
             scene.add(ball);
+
+            for (let i = 0; i < MAX_TRAIL; i++) {
+                let tGeo = new THREE.SphereGeometry(0.7 * (1 - i/MAX_TRAIL), 8, 8);
+                let tMat = new THREE.MeshBasicMaterial({ color: 0xff0055, transparent: true, opacity: 0.6 * (1 - i/MAX_TRAIL) });
+                let tMesh = new THREE.Mesh(tGeo, tMat);
+                scene.add(tMesh);
+                ballTrail.push(tMesh);
+            }
 
             createBots();
 
@@ -118,15 +109,51 @@
             animate();
         }
 
+        // Конструктор человечков (Роблокс / Бравл Стайл)
+        function createCharacter(colorHex) {
+            const group = new THREE.Group();
+            const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5 });
+            const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.6 });
+
+            const torsoGeo = new THREE.CylinderGeometry(0.6, 0.5, 1.4, 12);
+            const torso = new THREE.Mesh(torsoGeo, bodyMat);
+            torso.position.y = 1.2;
+            group.add(torso);
+
+            const headGeo = new THREE.SphereGeometry(0.5, 16, 16);
+            const head = new THREE.Mesh(headGeo, skinMat);
+            head.position.y = 2.2;
+            group.add(head);
+
+            const armGeo = new THREE.CapsuleGeometry(0.2, 0.8, 4, 8);
+            
+            const leftArm = new THREE.Mesh(armGeo, bodyMat);
+            leftArm.position.set(-0.8, 1.3, 0);
+            group.add(leftArm);
+
+            const rightArm = new THREE.Mesh(armGeo, bodyMat);
+            rightArm.position.set(0.8, 1.3, 0);
+            group.add(rightArm);
+
+            const ringGeo = new THREE.RingGeometry(1.1, 1.3, 16);
+            const ringMat = new THREE.MeshBasicMaterial({ color: 0xffaa00, side: THREE.DoubleSide, transparent: true, opacity: 0 });
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = Math.PI / 2;
+            ring.position.y = 0.05;
+            group.add(ring);
+
+            group.userData = { leftArm, rightArm, ring, baseColor: colorHex };
+            return group;
+        }
+
         function createBots() {
             bots.forEach(b => scene.remove(b));
             bots = [];
-            const botGeo = new THREE.SphereGeometry(1);
+            const botColors = [0x9b5de5, 0xf15bb5, 0x00f5d4, 0xfee440];
 
             for (let i = 0; i < BOT_COUNT; i++) {
-                const botMat = new THREE.MeshBasicMaterial({ color: 0x9b5de5 });
-                const bot = new THREE.Mesh(botGeo, botMat);
-                bot.position.set((Math.random() - 0.5) * (ARENA_SIZE * 1.3), 1, (Math.random() - 0.5) * (ARENA_SIZE * 1.3));
+                const bot = createCharacter(botColors[i % botColors.length]);
+                bot.position.set((Math.random() - 0.5) * (ARENA_SIZE * 1.4), 0, (Math.random() - 0.5) * (ARENA_SIZE * 1.2));
                 bot.isPlayer = false;
                 bot.isAlive = true;
                 bot.aiTimer = 0;
@@ -135,24 +162,28 @@
                 bots.push(bot);
                 scene.add(bot);
             }
-        } function selectNewTarget(exception) {
+        }
+
+        function selectNewTarget(exception) {
             let pool = [];
             if (player && player.isAlive && player !== exception) pool.push(player);
-            bots.forEach(b => {
-                if (b.isAlive && b !== exception) pool.push(b);
-            });
+            bots.forEach(b => { if (b.isAlive && b !== exception) pool.push(b); });
 
-            if (pool.length === 0 && exception && exception.isAlive) {
-                pool.push(exception);
-            }
+            if (pool.length === 0 && exception && exception.isAlive) pool.push(exception);
 
             if (pool.length > 0) {
                 currentTarget = pool[Math.floor(Math.random() * pool.length)];
-                bots.forEach(b => { if(b.isAlive) b.material.color.setHex(0x9b5de5); });
-                if (player && player.isAlive && !isBlocking) player.material.color.setHex(0x00adb5);
+                bots.forEach(b => { if(b.isAlive) b.userData.ring.material.opacity = 0; });
+                player.userData.ring.material.opacity = 0;
+                document.getElementById('danger-alert').style.display = 'none';
+
+                currentTarget.userData.ring.material.opacity = 1;
                 
-                if (currentTarget !== player) {
-                    currentTarget.material.color.setHex(0xff9f1c); // Цель подсвечивается оранжевым
+                if (currentTarget === player) {
+                    currentTarget.userData.ring.material.color.setHex(0xff0000); 
+                    document.getElementById('danger-alert').style.display = 'block';
+                } else {
+                    currentTarget.userData.ring.material.color.setHex(0xffaa00); 
                 }
             } else {
                 currentTarget = null;
@@ -165,7 +196,7 @@
             document.getElementById('bots-count').innerText = count;
             
             if (count === 1 && player && player.isAlive) {
-                alert("ПОБЕДА! Вы уничтожили всех ботов!");
+                alert("👑 ПОБЕДА СТИЛЯ BRAWL STARS! Вы выбили всех челов!");
                 restartGame();
             }
         }
@@ -173,20 +204,14 @@
         function restartGame() {
             if (!player || !ball) return;
             player.isAlive = true;
-            player.position.set(0, 1, 14);
-            player.material.color.setHex(0x00adb5);
-            
+            player.position.set(0, 0, 14);
             createBots();
-            
-            ball.position.set(0, 1, -12);
-            ballSpeed = 0.18;
+            ball.position.set(0, 1.2, -12);
+            ballSpeed = 0.22;
             score = 0;
             document.getElementById('score').innerText = score;
-            
             selectNewTarget();
-        }
-
-        function handleInput(e, isDown) {
+        }        function handleInput(e, isDown) {
             let key = e.key.toLowerCase();
             if (e.code === 'Space') key = 'Space';
             if (e.key === 'ArrowUp') key = 'w';
@@ -204,114 +229,138 @@
         function triggerPlayerBlock() {
             isBlocking = true;
             blockCooldown = true;
-            player.material.color.setHex(0x00ff00); // Зеленый цвет щита
+
+            // Анимация рук вперед для блока
+            player.userData.leftArm.rotation.x = -Math.PI / 2;
+            player.userData.rightArm.rotation.x = -Math.PI / 2;
+            player.userData.ring.material.color.setHex(0x00ff00); 
 
             setTimeout(() => {
                 isBlocking = false;
-                if (currentTarget === player) player.material.color.setHex(0xff9f1c);
-                else player.material.color.setHex(0x00adb5);
-                
-                setTimeout(() => { blockCooldown = false; }, 400);
-            }, 300); // Блок активен 300мс
+                if (player.isAlive) {
+                    player.userData.leftArm.rotation.x = 0;
+                    player.userData.rightArm.rotation.x = 0;
+                    player.userData.ring.material.color.setHex(currentTarget === player ? 0xff0000 : 0x00adb5);
+                }
+                setTimeout(() => { blockCooldown = false; }, 150); 
+            }, 250);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
         }
 
         function animate() {
             requestAnimationFrame(animate);
 
-            if (!player || !ball) return;
+            if (!player || !ball || !currentTarget) return;
 
-            // 1. Движение игрока
+            // 1. Движение игрока и разворот модели
             if (player.isAlive) {
-                const moveSpeed = 0.22;
-                if (keys.w && player.position.z > -ARENA_SIZE) player.position.z -= moveSpeed;
-                if (keys.s && player.position.z < ARENA_SIZE) player.position.z += moveSpeed;
-                if (keys.a && player.position.x > -ARENA_SIZE) player.position.x -= moveSpeed;
-                if (keys.d && player.position.x < ARENA_SIZE) player.position.x += moveSpeed;
+                const moveSpeed = 0.26;
+                let moveX = 0;
+                let moveZ = 0;
+
+                if (keys.w && player.position.z > -ARENA_SIZE) moveZ -= moveSpeed;
+                if (keys.s && player.position.z < ARENA_SIZE) moveZ += moveSpeed;
+                if (keys.a && player.position.x > -ARENA_SIZE) moveX -= moveSpeed;
+                if (keys.d && player.position.x < ARENA_SIZE) moveX += moveSpeed;
+
+                player.position.x += moveX;
+                player.position.z += moveZ;
+
+                if (moveX !== 0 || moveZ !== 0) {
+                    let angle = Math.atan2(moveX, moveZ);
+                    player.rotation.y = angle;
+                }
             }
 
-            // 2. Движение и авто-блок ботов
+            // 2. Логика ИИ ботов и их автоблоки
             bots.forEach(bot => {
                 if (!bot.isAlive) return;
 
                 bot.aiTimer--;
                 if (bot.aiTimer <= 0) {
-                    bot.aiTimer = Math.random() * 60 + 30;
-                    bot.moveDir.set(Math.random() * 2 - 1, 0, Math.random() * 2 - 1).normalize();
+                    bot.aiTimer = Math.floor(Math.random() * 40) + 20;
+                    bot.moveDir.set((Math.random() - 0.5), 0, (Math.random() - 0.5)).normalize();
                 }
 
-                bot.position.addScaledVector(bot.moveDir, 0.12);
-                
-                bot.position.x = Math.max(-ARENA_SIZE + 1, Math.min(ARENA_SIZE - 1, bot.position.x));
-                bot.position.z = Math.max(-ARENA_SIZE + 1, Math.min(ARENA_SIZE - 1, bot.position.z));
+                const botSpeed = 0.16;
+                bot.position.addScaledVector(bot.moveDir, botSpeed);
+                bot.position.x = Math.max(-ARENA_SIZE, Math.min(ARENA_SIZE, bot.position.x));
+                bot.position.z = Math.max(-ARENA_SIZE, Math.min(ARENA_SIZE, bot.position.z));
 
-                let distToBall = bot.position.distanceTo(ball.position);
-                if (currentTarget === bot && distToBall < (3.0 + ballSpeed * 5) && !bot.isBlocking) {
-                    let reactionChance = Math.random();
-                    if (reactionChance > (ballSpeed * 0.5 - 0.05)) { 
-                        bot.isBlocking = true;
-                        bot.material.color.setHex(0xffffff); // Белая вспышка блока бота
-                        
+                if (bot.moveDir.lengthSq() > 0) {
+                    bot.rotation.y = Math.atan2(bot.moveDir.x, bot.moveDir.z);
+                }
+
+                let distToBall = bot.position.clone().setY(1.2).distanceTo(ball.position);
+                if (currentTarget === bot && distToBall < (ballSpeed * 14) && !bot.isBlocking) {
+                    bot.isBlocking = true;
+                    bot.userData.leftArm.rotation.x = -Math.PI / 2;
+                    bot.userData.rightArm.rotation.x = -Math.PI / 2;
+                    bot.userData.ring.material.opacity = 1;
+                    bot.userData.ring.material.color.setHex(0x00ff00);
+                    
+                    setTimeout(() => {
+                        if (bot.position.clone().setY(1.2).distanceTo(ball.position) < 4.0 && currentTarget === bot) {
+                            selectNewTarget(bot);
+                            ballSpeed += 0.02; 
+                        }
                         setTimeout(() => {
                             bot.isBlocking = false;
-                            if (bot.isAlive) bot.material.color.setHex(0x9b5de5);
-                        }, 250);
-                    }
+                            if (bot.isAlive) {
+                                bot.userData.leftArm.rotation.x = 0;
+                                bot.userData.rightArm.rotation.x = 0;
+                                bot.userData.ring.material.opacity = 0;
+                            }
+                        }, 200);
+                    }, Math.random() * 80 + 30);
                 }
             });
 
-            // 3. Логика преследования мяча
-            if (currentTarget && currentTarget.isAlive) {
-                let targetDir = new THREE.Vector3().subVectors(currentTarget.position, ball.position).normalize();
-                ballDirection.lerp(targetDir, 0.08); 
-                ball.position.addScaledVector(ballDirection, ballSpeed);
+            // 3. Расчет хвоста (шлейфа) мяча
+            for (let i = ballTrail.length - 1; i > 0; i--) {
+                ballTrail[i].position.copy(ballTrail[i-1].position);
+            }
+            ballTrail[0].position.copy(ball.position);
 
-                const distance = currentTarget.position.distanceTo(ball.position);
+            // 4. Движение мяча
+            let targetPos = currentTarget.position.clone().setY(1.2);
+            let dir = new THREE.Vector3().subVectors(targetPos, ball.position).normalize();
+            ball.position.addScaledVector(dir, ballSpeed);
 
-                if (distance < 3.5) {
-                    let isTargetBlocking = currentTarget.isPlayer ? isBlocking : currentTarget.isBlocking;
-
-                    if (isTargetBlocking) {
-                        ballSpeed += 0.025; // Мяч ускоряется
-                        if (currentTarget.isPlayer) {
-                            score++;
-                            document.getElementById('score').innerText = score;
-                        }
+            // 5. Проверка столкновений
+            let distance = ball.position.distanceTo(targetPos);
+            if (distance < 2.0) {
+                if (currentTarget.isPlayer) {
+                    if (isBlocking) {
+                        score++;
+                        document.getElementById('score').innerText = score;
+                        ballSpeed += 0.025; 
+                        selectNewTarget(player);
+                    } else {
+                        player.isAlive = false;
+                        alert("💥 БУМ! Тебя выбили с арены! Попробуй еще раз.");
+                        restartGame();
+                    }
+                } else {
+                    if (currentTarget.isBlocking) {
                         selectNewTarget(currentTarget);
-                    } 
-                    else if (distance < 1.4) {
-                        if (currentTarget.isPlayer) {
-                            player.isAlive = false;
-                            alert(`Вы выбыли! Счёт отбиваний: ${score}`);
-                            restartGame();
-                        } else {
-                            currentTarget.isAlive = false;
-                            scene.remove(currentTarget);
-                            ballSpeed = Math.max(0.18, ballSpeed - 0.05);
-                            selectNewTarget();
-                        }
+                    } else {
+                        currentTarget.isAlive = false;
+                        scene.remove(currentTarget);
+                        selectNewTarget();
                     }
                 }
-            } else {
-                selectNewTarget();
-            }
-
-            // 4. Следование 3D-камеры за игроком со спины
-            if (player.isAlive) {
-                camera.position.x = THREE.MathUtils.lerp(camera.position.x, player.position.x, 0.08);
-                camera.position.y = THREE.MathUtils.lerp(camera.position.y, player.position.y + 6, 0.08);
-                camera.position.z = THREE.MathUtils.lerp(camera.position.z, player.position.z + 12, 0.08);
-                camera.lookAt(player.position.x, player.position.y + 1, player.position.z - 2);
             }
 
             renderer.render(scene, camera);
         }
 
-        function onWindowResize() {
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        // Запуск
-        init();
+        window.onload = init;
     </script>
 </body>
 </html>
