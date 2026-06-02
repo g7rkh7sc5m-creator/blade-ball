@@ -26,7 +26,6 @@
         МОНЕТЫ: <span id="coins">50</span> | ОРУЖИЕ: <span id="current-weapon">Кулаки</span> | МЯЧ: <span id="current-ball">Дефолт</span> | СПОСОБНОСТЬ: <span id="current-ability">Рывок</span>
         <div id="alive-counter">СТАТУС: <span id="game-status">В ЛОББИ</span> | БОЙЦОВ: <span id="bots-count">0</span></div>
     </div>
-    <div id="danger-alert">МЯЧ ЛЕТИТ В ТЕБЯ! БЛОКИРУЙ!</div>
     <div id="crate-modal"><h2 id="crate-title">КЕЙС</h2><div id="roulette">Крутим...</div></div>
     <canvas id="gameCanvas"></canvas>
 
@@ -116,7 +115,7 @@
         }
 
         function startNewMatch(){if(mActive)return;mActive=true;ballSpeed=5.5;bots=[];slowActive=false;for(let i=0;i<3;i++)bots.push({x:Math.random()*650+75,y:Math.random()*200+80,radius:20,color:botColors[i],isAlive:true,isBlocking:false,aiTimer:0,moveX:0,moveY:0,angle:0,inMatch:true});ball.x=400;ball.y=180;selectNewTarget(player.inMatch?null:player)}
-        function selectNewTarget(ex){let p=[];if(player.isAlive&&player.inMatch&&player!==ex)p.push(player);bots.forEach(b=>{if(b.isAlive)p.push(b)});if(invisActive&&p.length>1)p=p.filter(x=>!x.isPlayer);if(p.length===2&&ex){currentTarget=p.find(x=>x!==ex)}else if(p.length>0){let ts=p.filter(x=>x!==ex);if(ts.length===0)ts=p;currentTarget=ts[Math.floor(Math.random()*ts.length)]}else{currentTarget=null;mActive=false;setTimeout(startNewMatch,3000)}document.getElementById('danger-alert').style.display=(currentTarget===player&&player.isAlive)?'block':'none';updateAlive()}
+        function selectNewTarget(ex){let p=[];if(player.isAlive&&player.inMatch&&player!==ex)p.push(player);bots.forEach(b=>{if(b.isAlive)p.push(b)});if(invisActive&&p.length>1)p=p.filter(x=>!x.isPlayer);if(p.length===2&&ex){currentTarget=p.find(x=>x!==ex)}else if(p.length>0){let ts=p.filter(x=>x!==ex);if(ts.length===0)ts=p;currentTarget=ts[Math.floor(Math.random()*ts.length)]}else{currentTarget=null;mActive=false;setTimeout(startNewMatch,3000)}            updateAlive();      
         function updateAlive(){let c=(player.isAlive&&player.inMatch?1:0)+bots.filter(b=>b.isAlive).length;if(mActive&&c===1){let w=player.isAlive&&player.inMatch?player:bots.find(b=>b.isAlive);if(w&&w.isPlayer){coins+=15;document.getElementById('coins').innerText=coins;saveProgress();alert("👑 ПОБЕДА! +15 монет!")}mActive=false;currentTarget=null;setTimeout(startNewMatch,3000)}}
 
         // === ГРАФИКА И УПРАВЛЕНИЕ ОБОИХ РЕЖИМОВ ===
