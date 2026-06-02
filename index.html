@@ -90,26 +90,77 @@
         // === ОТРИСОВКА ПЕРСОНАЖЕЙ ===
         function drawCharacter(c){if(!c.isAlive)return;if(c.isPlayer&&invisActive)ctx.globalAlpha=0.25;ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);if(currentTarget===c&&mActive){ctx.beginPath();ctx.arc(0,0,c.radius+8,0,Math.PI*2);ctx.lineWidth=3;ctx.strokeStyle=c.isPlayer?'#ff0000':'#ffaa00';ctx.stroke()}if((c.isPlayer&&(isBlocking||shieldActive))||(!c.isPlayer&&c.isBlocking)){ctx.beginPath();ctx.arc(0,0,c.radius+14,-Math.PI/2,Math.PI/2);ctx.lineWidth=4;ctx.strokeStyle=shieldActive?'#00ffff':'rgba(0,255,0,0.6)';ctx.stroke()}ctx.fillStyle=c.color;ctx.fillRect(-5,-c.radius-4,10,8);ctx.fillRect(-5,c.radius-4,10,8);if(c.isPlayer&&player.weaponData){ctx.save();if(isBlocking){ctx.rotate(wAngle);ctx.translate(c.radius-2,-5)}else{ctx.translate(-8,-c.radius-8);ctx.rotate(-Math.PI/4)}let w=player.weaponData;ctx.lineWidth=2;ctx.strokeStyle='#000';if(w.type==='sword'){ctx.fillStyle=w.color;ctx.fillRect(10,-1,32,7)}else if(w.type==='axe'){ctx.fillStyle=w.color;ctx.beginPath();ctx.moveTo(20,-10);ctx.lineTo(32,-14);ctx.lineTo(32,18);ctx.lineTo(20,14);ctx.closePath();ctx.fill();ctx.stroke()}else if(w.type==='banana'){ctx.fillStyle=w.color;ctx.beginPath();ctx.arc(15,0,12,-Math.PI/3,Math.PI/3,false);ctx.lineWidth=6;ctx.strokeStyle=w.color;ctx.stroke()}else if(w.type==='spear'){ctx.fillStyle=w.color;ctx.fillRect(25,-5,3,15);ctx.fillRect(28,1,11,3)}ctx.restore()}ctx.beginPath();ctx.arc(0,0,c.radius,0,Math.PI*2);ctx.fillStyle=c.color;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#000';ctx.stroke();ctx.beginPath();ctx.arc(2,0,c.radius*.5,0,Math.PI*2);ctx.fillStyle='#ffdbac';ctx.fill();ctx.stroke();if(c.isPlayer){ctx.fillStyle='#ff2e63';ctx.fillRect(-4,-c.radius-2,8,5);ctx.fillRect(-4,c.radius-3,8,5)}ctx.restore();ctx.globalAlpha=1;}
 
-        // === ОБРАБОТКА СЕНСОРНОГО МОБИЛЬНОГО ДЖОЙСТИКА ===
+        // === ТРИГГЕРЫ ДЕЙСТВИЙ (БЛОК И УЛЬТА) ===
+        function triggerBlock() {
+            if (!bCD && !isBlocking && player.isAlive && player.inMatch) {
+                isBlocking = true; bCD = true; wAngle = -Math.PI / 4;
+                setTimeout(() => { isBlocking = false; setTimeout(() => { bCD = false }, 200) }, 280);
+            }
+        }
+
+        function triggerAbility() {
+            if (!dCD && player.isAlive && player.inMatch) {
+                dCD = true; let type = player.abilityData.type;
+                if (type === 'dash') {
+                    let dx = mobileMove.x || 0, dy = mobileMove.y || 0;
+                    if (dx === 0 && dy === 0) { if (keys.w) dy = -1; if (keys.s) dy = 1; if (keys.a) dx = -1; if (keys.d) dx = 1; }
+                    if (dx === 0 && dy === 0) { dx = Math.cos(player.angle); dy = Math.sin(player.angle) }
+                    player.x += dx * 75; player.y += dy * 75;
+                } 
+                else if (type === 'tele' && currentTarget === player) { selectNewTarget(player); ballSpeed += 1.5; } 
+                else if (type === 'shield') { shieldActive = true; setTimeout(() => { shieldActive = false }, 1500); } 
+                else if (type === 'invis') { invisActive = true; selectNewTarget(null); setTimeout(() => { invisActive = false }, 3000); } 
+                else if (type === 'slow') { slowActive = true; ballSpeed = Math.max(3, ballSpeed - 4); setTimeout(() => { slowActive = false }, 2500); } 
+                else if (type === 'magnet' && mActive) { ball.x = player.x + (ball.x - player.x) * 0.4; ball.y = player.y + (ball.y - player.y) * 0.4; } 
+                else if (type === 'vortex') { bots.forEach(b => { if (b.isAlive) { b.x += (400 - b.x) * 0.3; b.y += (180 - b.y) * 0.3 } }); } 
+                else if (type === 'clone') { cParry(player.x - 30, player.y, 'normal'); cParry(player.x + 30, player.y, 'normal'); if (currentTarget === player) selectNewTarget(player); } 
+                else if (type === 'meteor') { bots.forEach(b => { if (b.isAlive && Math.random() > 0.4) { b.isAlive = false; cDeath(b.x, b.y, 'fire'); selectNewTarget(b) } }); } 
+                else if (type === 'swap') {
+                    let aliveBots = bots.filter(b => b.isAlive);
+                    if (aliveBots.length > 0) {
+                        let tBot = aliveBots[Math.floor(Math.random() * aliveBots.length)];
+                        let px = player.x, py = player.y; player.x = tBot.x; player.y = tBot.y; tBot.x = px; tBot.y = py;
+                    }
+                }
+                setTimeout(() => { dCD = false }, type === 'magnet' ? 800 : 4000);
+            }
+        }
+
+        // === ОБРАБОТКА НАЖАТИЙ (МОБИЛКИ И PC КОМПЬЮТЕР) ===
         const jContainer = document.getElementById('joystick-container'), jStick = document.getElementById('joystick-stick');
         let jActive = false, jCenterX = 0, jCenterY = 0;
+        
+        function handleJoy(t) {
+            let dx = t.clientX - jCenterX, dy = t.clientY - jCenterY, dist = Math.hypot(dx, dy), maxDist = 35;
+            if(dist > maxDist) { dx = (dx/dist)*maxDist; dy = (dy/dist)*maxDist; }
+            jStick.style.transform = `translate(${dx}px, ${dy}px)`; 
+            mobileMove.x = dx / maxDist; mobileMove.y = dy / maxDist;
+        }
+
         jContainer.addEventListener('touchstart', e => { jActive = true; const r = jContainer.getBoundingClientRect(); jCenterX = r.left + r.width/2; jCenterY = r.top + r.height/2; handleJoy(e.touches[0]); });
         jContainer.addEventListener('touchmove', e => { if(jActive) { e.preventDefault(); handleJoy(e.touches[0]); } });
         jContainer.addEventListener('touchend', () => { jActive = false; jStick.style.transform = 'translate(0px, 0px)'; mobileMove = {x:0,y:0}; });
-        function handleJoy(t) {
-            let dx = t[0].clientX - jCenterX, dy = t[0].clientY - jCenterY, dist = Math.hypot(dx, dy), maxDist = 35;
-            if(dist > maxDist) { dx = (dx/dist)*maxDist; dy = (dy/dist)*maxDist; }
-            jStick.style.transform = `translate(${dx}px, ${dy}px)`; 
-            // ФИКС ДВИЖЕНИЯ: теперь данные джойстика гарантированно передаются персонажу!
-            mobileMove.x = dx / maxDist; 
-            mobileMove.y = dy / maxDist; 
-        }
         
-        // === КЛАВИАТУРА ДЛЯ КОМПЬЮТЕРА (PC) ===
-        window.addEventListener('keydown',e=>{let k=e.key.toLowerCase();if(e.code==='Space')triggerBlock();if(e.code==='ShiftLeft'||e.code==='ShiftRight')triggerAbility();if(k==='w'||e.key==='ArrowUp')keys.w=true;if(k==='s'||e.key==='ArrowDown')keys.s=true;if(k==='a'||e.key==='ArrowLeft')keys.a=true;if(k==='d'||e.key==='ArrowRight')keys.d=true});
-         // ЧЕТЫРЕ КЕЙСА В БЕЗОПАСНОЙ СВЯЗКЕ СПРАВА
-        const wCrate={x:80,y:600,r:30}, aCrate={x:240,y:600,r:30}, bCrate={x:540,y:600,r:30}, eCrate={x:700,y:600,r:30};
+        // Для тестов джойстика мышкой на компьютере
+        jContainer.addEventListener('mousedown', e => { jActive = true; const r = jContainer.getBoundingClientRect(); jCenterX = r.left + r.width/2; jCenterY = r.top + r.height/2; handleJoy(e); });
+        window.addEventListener('mousemove', e => { if(jActive) handleJoy(e); });
+        window.addEventListener('mouseup', () => { jActive = false; jStick.style.transform = 'translate(0px, 0px)'; mobileMove = {x:0,y:0}; });
 
+        document.getElementById('btn-block').addEventListener('touchstart', e => { e.preventDefault(); triggerBlock(); });
+        document.getElementById('btn-ability').addEventListener('touchstart', e => { e.preventDefault(); triggerAbility(); });
+        document.getElementById('btn-block').addEventListener('mousedown', triggerBlock);
+        document.getElementById('btn-ability').addEventListener('mousedown', triggerAbility);
+
+        window.addEventListener('keydown', e => {
+            let k = e.key.toLowerCase(); if (e.code === 'Space') triggerBlock(); if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') triggerAbility();
+            if (k === 'w' || e.key === 'ArrowUp') keys.w = true; if (k === 's' || e.key === 'ArrowDown') keys.s = true;
+            if (k === 'a' || e.key === 'ArrowLeft') keys.a = true; if (k === 'd' || e.key === 'ArrowRight') keys.d = true;
+        });
+        window.addEventListener('keyup', e => {
+            let k = e.key.toLowerCase();
+            if (k === 'w' || e.key === 'ArrowUp') keys.w = false; if (k === 's' || e.key === 'ArrowDown') keys.s = false;
+            if (k === 'a' || e.key === 'ArrowLeft') keys.a = false; if (k === 'd' || e.key === 'ArrowRight') keys.d = false;
+        });
         function update(){
             if(isBlocking && wAngle < Math.PI / 4) { wAngle += 0.15 }
             ctx.fillStyle='#090a14';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.fillStyle='#121424';ctx.fillRect(0,480,canvas.width,canvas.height-480);ctx.strokeStyle='#222538';ctx.lineWidth=4;ctx.strokeRect(0,480,canvas.width,canvas.height-480);
