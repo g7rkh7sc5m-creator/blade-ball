@@ -97,11 +97,14 @@
         jContainer.addEventListener('touchmove', e => { if(jActive) { e.preventDefault(); handleJoy(e.touches[0]); } });
         jContainer.addEventListener('touchend', () => { jActive = false; jStick.style.transform = 'translate(0px, 0px)'; mobileMove = {x:0,y:0}; });
         function handleJoy(t) {
-            let dx = t.clientX - jCenterX, dy = t.clientY - jCenterY, dist = Math.hypot(dx, dy), maxDist = 35;
+            let dx = t[0].clientX - jCenterX, dy = t[0].clientY - jCenterY, dist = Math.hypot(dx, dy), maxDist = 35;
             if(dist > maxDist) { dx = (dx/dist)*maxDist; dy = (dy/dist)*maxDist; }
-            jStick.style.transform = `translate(${dx}px, ${dy}px)`; mobileMove = { x: dx/maxDist, y: dy/maxDist };
+            jStick.style.transform = `translate(${dx}px, ${dy}px)`; 
+            // ФИКС ДВИЖЕНИЯ: теперь данные джойстика гарантированно передаются персонажу!
+            mobileMove.x = dx / maxDist; 
+            mobileMove.y = dy / maxDist; 
         }
-
+        
         // === КЛАВИАТУРА ДЛЯ КОМПЬЮТЕРА (PC) ===
         window.addEventListener('keydown',e=>{let k=e.key.toLowerCase();if(e.code==='Space')triggerBlock();if(e.code==='ShiftLeft'||e.code==='ShiftRight')triggerAbility();if(k==='w'||e.key==='ArrowUp')keys.w=true;if(k==='s'||e.key==='ArrowDown')keys.s=true;if(k==='a'||e.key==='ArrowLeft')keys.a=true;if(k==='d'||e.key==='ArrowRight')keys.d=true});
          // ЧЕТЫРЕ КЕЙСА В БЕЗОПАСНОЙ СВЯЗКЕ СПРАВА
