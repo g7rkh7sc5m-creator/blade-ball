@@ -195,7 +195,7 @@
                             ballSpeed+=.65;cParry(ball.x,ball.y,player.weaponData?player.weaponData.type:'normal');selectNewTarget(player);saveProgress();
                             let a=Math.atan2(currentTarget.y-ball.y,currentTarget.x-ball.x);ball.x-=Math.cos(a)*(ballSpeed+40);ball.y-=Math.sin(a)*(ballSpeed+40);
                         }else if(!isBlocking&&!shieldActive&&dst<(currentTarget.radius+ball.radius)){
-                            cDeath(player.x,player.y,'fire');player.isAlive=false;player.inMatch=false;document.getElementById('danger-alert').style.display='none';selectNewTarget(player);setTimeout(()=>{player.isAlive=true;player.x=400;player.y=660},1000)}
+                            cDeath(player.x,player.y,'fire');player.isAlive=false;player.inMatch=false;selectNewTarget(player);setTimeout(()=>{player.isAlive=true;player.x=400;player.y=660},1000)}
                     }else{
                         if(currentTarget.isBlocking){selectNewTarget(currentTarget)}
                         else if(dst<(currentTarget.radius+ball.radius)){cDeath(currentTarget.x,currentTarget.y,currentKillEffect);currentTarget.isAlive=false;selectNewTarget(currentTarget)}
