@@ -103,47 +103,7 @@
 
         // === КЛАВИАТУРА ДЛЯ КОМПЬЮТЕРА (PC) ===
         window.addEventListener('keydown',e=>{let k=e.key.toLowerCase();if(e.code==='Space')triggerBlock();if(e.code==='ShiftLeft'||e.code==='ShiftRight')triggerAbility();if(k==='w'||e.key==='ArrowUp')keys.w=true;if(k==='s'||e.key==='ArrowDown')keys.s=true;if(k==='a'||e.key==='ArrowLeft')keys.a=true;if(k==='d'||e.key==='ArrowRight')keys.d=true});
-        window.addEventListener('keyup',e=>{let k=e.key.toLowerCase();if(k==='w'||e.key==='ArrowUp')keys.w=false;if(k==='s'||e.key==='ArrowDown')keys.s=false;if(k==='a'||e.key==='ArrowLeft')keys.a=false;if(k==='d'||e.key==='ArrowRight')keys.d=false});    
-        // === ТРИГГЕРЫ ДЕЙСТВИЙ (МЯГКИЙ БЛОК И 10 УЛЬТ) ===
-        function triggerBlock() {
-            if (!bCD && !isBlocking && player.isAlive && player.inMatch) {
-                isBlocking = true; bCD = true; wAngle = -Math.PI / 4;
-                setTimeout(() => { isBlocking = false; setTimeout(() => { bCD = false }, 200) }, 280);
-            }
-        }
-
-        function triggerAbility() {
-            if (!dCD && player.isAlive && player.inMatch) {
-                dCD = true; let type = player.abilityData.type;
-                if (type === 'dash') {
-                    let dx = mobileMove.x || 0, dy = mobileMove.y || 0;
-                    if (dx === 0 && dy === 0) { if (keys.w) dy = -1; if (keys.s) dy = 1; if (keys.a) dx = -1; if (keys.d) dx = 1; }
-                    if (dx === 0 && dy === 0) { dx = Math.cos(player.angle); dy = Math.sin(player.angle) }
-                    player.x += dx * 75; player.y += dy * 75;
-                } 
-                else if (type === 'tele' && currentTarget === player) { selectNewTarget(player); ballSpeed += 1.5; } 
-                else if (type === 'shield') { shieldActive = true; setTimeout(() => { shieldActive = false }, 1500); } 
-                else if (type === 'invis') { invisActive = true; selectNewTarget(null); setTimeout(() => { invisActive = false }, 3000); } 
-                else if (type === 'slow') { slowActive = true; ballSpeed = Math.max(3, ballSpeed - 4); setTimeout(() => { slowActive = false }, 2500); } 
-                else if (type === 'magnet' && mActive) { ball.x = player.x + (ball.x - player.x) * 0.4; ball.y = player.y + (ball.y - player.y) * 0.4; } 
-                else if (type === 'vortex') { bots.forEach(b => { if (b.isAlive) { b.x += (400 - b.x) * 0.3; b.y += (180 - b.y) * 0.3 } }); } 
-                else if (type === 'clone') { cParry(player.x - 30, player.y, 'normal'); cParry(player.x + 30, player.y, 'normal'); if (currentTarget === player) selectNewTarget(player); } 
-                else if (type === 'meteor') { bots.forEach(b => { if (b.isAlive && Math.random() > 0.4) { b.isAlive = false; cDeath(b.x, b.y, 'fire'); selectNewTarget(b) } }); } 
-                else if (type === 'swap') {
-                    let aliveBots = bots.filter(b => b.isAlive);
-                    if (aliveBots.length > 0) {
-                        let tBot = aliveBots[Math.floor(Math.random() * aliveBots.length)];
-                        let px = player.x, py = player.y; player.x = tBot.x; player.y = tBot.y; tBot.x = px; tBot.y = py;
-                    }
-                }
-                setTimeout(() => { dCD = false }, type === 'magnet' ? 800 : 4000);
-            }
-        }
-
-        document.getElementById('btn-block').addEventListener('touchstart', e => { e.preventDefault(); triggerBlock(); });
-        document.getElementById('btn-ability').addEventListener('touchstart', e => { e.preventDefault(); triggerAbility(); });
-
-        // ЧЕТЫРЕ КЕЙСА В БЕЗОПАСНОЙ СВЯЗКЕ СПРАВА
+         // ЧЕТЫРЕ КЕЙСА В БЕЗОПАСНОЙ СВЯЗКЕ СПРАВА
         const wCrate={x:80,y:600,r:30}, aCrate={x:240,y:600,r:30}, bCrate={x:540,y:600,r:30}, eCrate={x:700,y:600,r:30};
 
         function update(){
@@ -185,7 +145,7 @@
                 if(dst<(currentTarget.radius+ball.radius+ballSpeed)){
                     if(currentTarget.isPlayer){
                         if((isBlocking||shieldActive)&&(Date.now()-lastHitTime>180)){
-                            lastHitTime=Date.now();score++;coins+=3;document.getElementById('coins').innerText=coins;ballSpeed+=.65;cParry(ball.x,ball.y,player.weaponData?player.weaponData.type:'normal');selectNewTarget(player);saveProgress();
+                            lastHitTime=Date.now();score++;coins+=3;document.getElementById('score').innerText=coins;ballSpeed+=.65;cParry(ball.x,ball.y,player.weaponData?player.weaponData.type:'normal');selectNewTarget(player);saveProgress();
                             let a=Math.atan2(currentTarget.y-ball.y,currentTarget.x-ball.x);ball.x-=Math.cos(a)*(ballSpeed+40);ball.y-=Math.sin(a)*(ballSpeed+40);
                         }else if(!isBlocking&&!shieldActive&&dst<(currentTarget.radius+ball.radius)){
                             cDeath(player.x,player.y,'fire');player.isAlive=false;player.inMatch=false;document.getElementById('danger-alert').style.display='none';selectNewTarget(player);setTimeout(()=>{player.isAlive=true;player.x=400;player.y=660},1000)}
