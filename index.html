@@ -206,7 +206,9 @@
             for(let i=pParts.length-1;i>=0;i--){let p=pParts[i];p.x+=p.vx;p.y+=p.vy;p.alpha-=p.decay;if(p.alpha<=0){pParts.splice(i,1);continue}ctx.save();ctx.globalAlpha=p.alpha;ctx.beginPath();ctx.arc(p.x,p.y,p.radius,0,Math.PI*2);ctx.fillStyle=p.color;ctx.fill();ctx.restore()}
             drawCharacter(player);bots.forEach(drawCharacter);requestAnimationFrame(update);
         }
-        loadProgress();startNewMatch();update();
+                loadProgress();
+        startNewMatch();
+        update();
     </script>
 </body>
 </html>
